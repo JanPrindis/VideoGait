@@ -1,33 +1,43 @@
 import time
+from functools import partial
+
 import cv2
 import numpy as np
 
-from rtmlib import BodyWithFeet, PoseTracker
-from utils import jsonSerializer
+from rtmlib import BodyWithFeet, PoseTracker, RTMDet, RTMPose, Custom
 from utils.jsonSerializer import KeypointSerializer
 
 device = 'cuda'
 backend = 'onnxruntime'  # opencv, onnxruntime, openvino
-
-cap = cv2.VideoCapture("videos/logitech-1920-60-8.avi")  # Video file path
-
 openpose_skeleton = False  # True for openpose-style, False for mmpose-style
 
-body_feet_tracker = PoseTracker(
-    BodyWithFeet,
-    det_frequency=1,
-    to_openpose=openpose_skeleton,
-    mode='performance',  # balanced, performance, lightweight
+custom = partial(
+    Custom,
+    det_class="YOLOX",
+    det="models/yolo_x.onnx",
+    det_input_size=(640, 640),
+    pose_class="RTMPose",
+    pose="models/rtmpose_x.onnx",
+    pose_input_size=(288, 384),
     backend=backend,
     device=device,
-    tracking=False
+    to_openpose=openpose_skeleton,
 )
 
+tracker = PoseTracker(
+    solution=custom,
+    det_frequency=1,
+    to_openpose=openpose_skeleton,
+    backend=backend,
+    device=device,
+    tracking=True,
+)
+
+cap = cv2.VideoCapture("videos/logitech-1920-60-8.avi")  # Video file path
+file_name = "test"
+serializer = KeypointSerializer("./results/", f"{file_name}.json")
+
 frame_idx = 0
-
-file_name = "result"
-serializer = KeypointSerializer("./inferResults/", f"{file_name}.json")
-
 while cap.isOpened():
     success, frame = cap.read()
 
@@ -35,7 +45,7 @@ while cap.isOpened():
         break
 
     s = time.time()
-    keypoints, scores = body_feet_tracker(frame)
+    keypoints, scores = tracker(frame)
 
     if len(scores) == 0:
         continue
@@ -51,26 +61,11 @@ while cap.isOpened():
 
     frame_kpts = np.hstack([filtered_keypoints[0], filtered_scores[0][:, None]]).flatten().tolist()
 
-    # img_show = frame.copy()
     serializer.add_frame(
         frame_number=frame_idx,
         keypoints=frame_kpts
     )
 
-    # img_show = draw_skeleton(img_show,
-    #                          filtered_keypoints,
-    #                          filtered_scores,
-    #                          openpose_skeleton=openpose_skeleton,
-    #                          kpt_thr=0.6,
-    #                          line_width=3)
-
-    # img_show = cv2.resize(img_show, (960, 640))
-    # cv2.imshow('Result', img_show)
-    # key = cv2.waitKey(1) & 0xFF
-    # if key == ord('q'): # Press 'q' to exit
-    #     break
-
-    # video.write(img_show)
     frame_idx += 1
 
 serializer.save()
