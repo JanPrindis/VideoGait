@@ -9,7 +9,6 @@ from utils.jsonSerializer import KeypointSerializer
 device = 'cuda'
 backend = 'onnxruntime'  # opencv, onnxruntime, openvino
 
-video_out_path = ".results/full.mp4"
 cap = cv2.VideoCapture("videos/logitech-1920-60-8.avi")  # Video file path
 
 openpose_skeleton = False  # True for openpose-style, False for mmpose-style
@@ -25,9 +24,6 @@ body_feet_tracker = PoseTracker(
 )
 
 frame_idx = 0
-video = cv2.VideoWriter('out.mp4',-1,60,(1920, 1080))
-
-cv2.namedWindow('Result', cv2.WINDOW_NORMAL)
 
 file_name = "result"
 serializer = KeypointSerializer("./inferResults/", f"{file_name}.json")
@@ -53,14 +49,13 @@ while cap.isOpened():
     det_time = time.time() - s
     print('det: ', det_time)
 
-    frame_kpts = np.hstack([filtered_keypoints[0], filtered_scores[0][:, None]])
+    frame_kpts = np.hstack([filtered_keypoints[0], filtered_scores[0][:, None]]).flatten().tolist()
 
     # img_show = frame.copy()
     serializer.add_frame(
         frame_number=frame_idx,
         keypoints=frame_kpts
     )
-
 
     # img_show = draw_skeleton(img_show,
     #                          filtered_keypoints,
@@ -78,6 +73,6 @@ while cap.isOpened():
     # video.write(img_show)
     frame_idx += 1
 
-
+serializer.save()
 cap.release()
 cv2.destroyAllWindows()
