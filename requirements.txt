@@ -1,5 +1,9 @@
-numpy
+numpy~=2.2.6
 onnxruntime
 opencv-contrib-python
-opencv-python
-tqdm
+opencv-python~=4.12.0.88
+tqdm~=4.67.1
+rich~=14.1.0
+matplotlib~=3.10.6
+scipy~=1.16.2
+rtmlib~=0.0.13
