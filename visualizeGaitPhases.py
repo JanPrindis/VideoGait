@@ -9,9 +9,9 @@ def print_statistics(left_phases, right_phases, support_phases):
     def phase_summary(phases, leg):
         stance = [p.duration for p in phases if p.phase_type == PhaseType.STANCE and p.valid]
         swing  = [p.duration for p in phases if p.phase_type == PhaseType.SWING and p.valid]
-        total  = sum(stance) + sum(swing)
-        stance_pct = (sum(stance) / total * 100) if total else 0
-        swing_pct  = (sum(swing) / total * 100) if total else 0
+        total  = np.mean(stance) + np.mean(swing)
+        stance_pct = (np.mean(stance) / total * 100) if total else 0
+        swing_pct  = (np.mean(swing) / total * 100) if total else 0
         return {
             "avg_stance": np.mean(stance) if stance else 0,
             "avg_swing": np.mean(swing) if swing else 0,
@@ -23,14 +23,14 @@ def print_statistics(left_phases, right_phases, support_phases):
         single_l = [s.duration for s in supports if s.support_type == SupportType.SINGLE_LEFT and s.valid]
         single_r = [s.duration for s in supports if s.support_type == SupportType.SINGLE_RIGHT and s.valid]
         double   = [s.duration for s in supports if s.support_type == SupportType.DOUBLE and s.valid]
-        total = sum(single_l) + sum(single_r) + sum(double)
+        total = np.mean(single_l) + np.mean(single_r) + np.mean(double)
         return {
             "avg_single_l": np.mean(single_l) if single_l else 0,
             "avg_single_r": np.mean(single_r) if single_r else 0,
             "avg_double": np.mean(double) if double else 0,
-            "pct_single_l": (sum(single_l)/total*100) if total else 0,
-            "pct_single_r": (sum(single_r)/total*100) if total else 0,
-            "pct_double": (sum(double)/total*100) if total else 0
+            "pct_single_l": (np.mean(single_l)/total*100) if total else 0,
+            "pct_single_r": (np.mean(single_r)/total*100) if total else 0,
+            "pct_double": (np.mean(double)/total*100) if total else 0
         }
 
     # --- Detailed phases ---
@@ -94,7 +94,7 @@ def visualize_gait_phases(left_phases, right_phases, support_phases, x_start=0, 
     # LEFT LEG
     for phase in left_phases:
         if not phase.valid or phase.phase_type == PhaseType.UNKNOWN:
-            continue  # <- přeskakuje UNKNOWN
+            continue
         axs[0].axvspan(
             phase.start_frame,
             phase.end_frame,
@@ -130,7 +130,7 @@ def visualize_gait_phases(left_phases, right_phases, support_phases, x_start=0, 
     # SUPPORT PHASES
     for sp in support_phases:
         if getattr(sp, "support_type", None) not in support_colors:
-            continue  # <- přeskočí UNKNOWN a cokoli jiného
+            continue
         axs[2].axvspan(
             sp.start_frame,
             sp.end_frame,

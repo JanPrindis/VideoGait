@@ -51,25 +51,39 @@ def filter_phases_generic(phases, excluded_ranges):
 def compute_support_phases(left_phases, right_phases, total_frames):
     stance_left = np.zeros(total_frames, dtype=bool)
     stance_right = np.zeros(total_frames, dtype=bool)
+    valid_left = np.zeros(total_frames, dtype=bool)
+    valid_right = np.zeros(total_frames, dtype=bool)
 
+    # levá noha
     for ph in left_phases:
-        if ph.phase_type == PhaseType.STANCE and ph.valid:
+        if not ph.valid:
+            continue
+        valid_left[ph.start_frame:ph.end_frame + 1] = True
+        if ph.phase_type == PhaseType.STANCE:
             stance_left[ph.start_frame:ph.end_frame + 1] = True
+
+    # pravá noha
     for ph in right_phases:
-        if ph.phase_type == PhaseType.STANCE and ph.valid:
+        if not ph.valid:
+            continue
+        valid_right[ph.start_frame:ph.end_frame + 1] = True
+        if ph.phase_type == PhaseType.STANCE:
             stance_right[ph.start_frame:ph.end_frame + 1] = True
 
+    # maska platných frameů – obě nohy mají data
+    valid_mask = valid_left & valid_right
+
+    # výpočet support typů jen tam, kde jsou obě nohy validní
     total_stance = stance_left.astype(int) + stance_right.astype(int)
-
     support_labels = np.array([SupportType.UNKNOWN for _ in range(total_frames)], dtype=object)
-    support_labels[total_stance == 2] = SupportType.DOUBLE
-    support_labels[(total_stance == 1) & stance_left] = SupportType.SINGLE_LEFT
-    support_labels[(total_stance == 1) & stance_right] = SupportType.SINGLE_RIGHT
+    support_labels[valid_mask & (total_stance == 2)] = SupportType.DOUBLE
+    support_labels[valid_mask & (total_stance == 1) & stance_left] = SupportType.SINGLE_LEFT
+    support_labels[valid_mask & (total_stance == 1) & stance_right] = SupportType.SINGLE_RIGHT
 
+    # vytvoření fází
     phases = []
     start = 0
     current_type = support_labels[0]
-
     for i in range(1, total_frames):
         if support_labels[i] != current_type:
             phases.append(SupportPhase(current_type, start, i - 1, i - start))
@@ -77,4 +91,7 @@ def compute_support_phases(left_phases, right_phases, total_frames):
             current_type = support_labels[i]
 
     phases.append(SupportPhase(current_type, start, total_frames - 1, total_frames - start))
+
+    # odstraníme UNKNOWN
     return [ph for ph in phases if ph.support_type != SupportType.UNKNOWN]
+
