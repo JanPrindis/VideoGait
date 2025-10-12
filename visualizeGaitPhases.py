@@ -56,14 +56,14 @@ def print_statistics(left_phases, right_phases, support_phases):
     for s in support_phases:
         if not s.valid:
             continue
-        print(f"{s.support_type.value:<13} | {s.start_frame:>5} -> {s.end_frame:<5} | dur={s.duration:<4}")
+        print(f"{s.support_type.value:<15} | {s.start_frame:>5} -> {s.end_frame:<5} | dur={s.duration:<4}")
 
     # --- Support summary ---
     sup_stats = support_summary(support_phases)
     print("\n=== SUPPORT SUMMARY ===")
     print(f"Avg single L: {sup_stats['avg_single_l']:.1f}  ({sup_stats['pct_single_l']:.1f}%)")
     print(f"Avg single R: {sup_stats['avg_single_r']:.1f}  ({sup_stats['pct_single_r']:.1f}%)")
-    print(f"Avg double:   {sup_stats['avg_double']:.1f}    ({sup_stats['pct_double']:.1f}%)")
+    print(f"Avg double:   {sup_stats['avg_double']:.1f}  ({sup_stats['pct_double']:.1f}%)")
 
     print("\n" + "=" * 50)
 

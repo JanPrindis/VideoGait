@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.signal import butter, filtfilt, find_peaks
-from sympy.physics.quantum.identitysearch import scipy
+from scipy.interpolate import CubicSpline
 
 def cubic_interpolate_nan(y):
     y = np.array([np.nan if v is None else v for v in y], dtype=float)
@@ -16,7 +16,7 @@ def cubic_interpolate_nan(y):
     y_seg = y[first_valid:last_valid + 1]
 
     mask_seg = ~np.isnan(y_seg)
-    cs = scipy.interpolate.CubicSpline(x_seg[mask_seg], y_seg[mask_seg])
+    cs = CubicSpline(x_seg[mask_seg], y_seg[mask_seg])
     y_interp = cs(x_seg)
 
     return np.array(y_interp)

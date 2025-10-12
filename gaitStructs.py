@@ -41,6 +41,17 @@ class SupportPhase:
     valid: bool = True
 
 
+class GaitEventType(str, Enum):
+    TOE_OFF = "toe_off"
+    HEEL_STRIKE = "heel_strike"
+
+
+@dataclass
+class GaitEvent:
+    frame: int
+    event_type: GaitEventType
+
+
 def filter_phases_generic(phases, excluded_ranges):
     for ph in phases:
         if any(not (ph.end_frame < s or ph.start_frame > e) for s, e in excluded_ranges):
@@ -94,3 +105,74 @@ def compute_support_phases(left_phases, right_phases, total_frames):
     # Filter out unknown data
     return [ph for ph in phases if ph.support_type != SupportType.UNKNOWN]
 
+
+def build_phases_from_events(left_events, right_events, excluded_ranges, total_frames, start_offset):
+
+    def in_excluded(i: int) -> bool:
+        return any(start <= i <= end for start, end in excluded_ranges)
+
+    def build_phases_for_leg(events: list[GaitEvent], leg: Leg) -> list[GaitPhase]:
+        phases = []
+        current_phase = PhaseType.UNKNOWN
+        phase_start = None
+
+        for event in sorted(events, key=lambda e: e.frame):
+            i = event.frame
+
+            # Skip excluded regions
+            if in_excluded(i):
+                if current_phase != PhaseType.UNKNOWN:
+                    # End current phase as invalid
+                    phases.append(GaitPhase(
+                        leg, current_phase,
+                        phase_start + start_offset,
+                        i - 1 + start_offset,
+                        i - phase_start,
+                        valid=False
+                    ))
+                    current_phase = PhaseType.UNKNOWN
+                    phase_start = None
+                continue
+
+            # Event to phase translation
+            if event.event_type == GaitEventType.HEEL_STRIKE:
+                new_phase = PhaseType.STANCE
+            elif event.event_type == GaitEventType.TOE_OFF:
+                new_phase = PhaseType.SWING
+            else:
+                new_phase = PhaseType.UNKNOWN
+
+            # Start of first phase or change
+            if new_phase != current_phase:
+                # End previous phase
+                if current_phase != PhaseType.UNKNOWN and phase_start is not None:
+                    valid = not any(not (i - 1 < s or phase_start > e) for s, e in excluded_ranges)
+                    phases.append(GaitPhase(
+                        leg, current_phase,
+                        phase_start + start_offset,
+                        i - 1 + start_offset,
+                        i - phase_start,
+                        valid
+                    ))
+                # Start new phase
+                current_phase = new_phase
+                phase_start = i
+
+        # Close last phase
+        if current_phase != PhaseType.UNKNOWN and phase_start is not None:
+            valid = not any(not (total_frames - 1 < s or phase_start > e) for s, e in excluded_ranges)
+            phases.append(GaitPhase(
+                leg, current_phase,
+                phase_start + start_offset,
+                total_frames - 1 + start_offset,
+                total_frames - phase_start,
+                valid
+            ))
+
+        return [p for p in phases if p.valid]
+
+    l_phases = build_phases_for_leg(left_events, Leg.LEFT)
+    r_phases = build_phases_for_leg(right_events, Leg.RIGHT)
+    support_phases = compute_support_phases(l_phases, r_phases, total_frames)
+
+    return l_phases, r_phases, support_phases
