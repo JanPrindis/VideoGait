@@ -60,18 +60,24 @@ def gait_detect_ghoussayni(
     left_heel_f = butterworth_filter(left_heel, cutoff=5, order=2, fs=frame_rate)
     right_heel_f = butterworth_filter(right_heel, cutoff=5, order=2, fs=frame_rate)
 
+    # Compute sagittal velocity, abs because direction does not matter
     left_toe_grad = np.abs(np.gradient(left_toe_f, 1.0 / frame_rate))
     right_toe_grad = np.abs(np.gradient(right_toe_f, 1.0 / frame_rate))
     left_heel_grad = np.abs(np.gradient(left_heel_f, 1.0 / frame_rate))
     right_heel_grad = np.abs(np.gradient(right_heel_f, 1.0 / frame_rate))
 
     # Dynamic threshold
+    # TODO: Is it worth to compute threshold based on hip velocity (movement speed)
+    #  -> Slower walking speed = lower threshold?
     if threshold is None:
         threshold = threshold_percentage * np.max(left_toe_grad)
 
 
     left_events = []
     right_events = []
+
+    # Toe-off: sagittal velocity of the heel marker fell below threshold
+    # Heel-strike:  sagittal velocity of the toe marker exceeded threshold
 
     # Left leg
     for val in np.where((left_toe_grad[:-1] <= threshold) & (left_toe_grad[1:] > threshold))[0]:
