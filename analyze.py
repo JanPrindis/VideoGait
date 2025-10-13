@@ -2,12 +2,12 @@ from enum import Enum
 
 import numpy as np
 
+from gaitDetectors.ghoussayni import gait_detect_ghoussayni
 from gaitDetectors.zeni import gait_detect_zeni
-from gaitStructs import PhaseType, GaitPhase, Leg, compute_support_phases, GaitEvent, GaitEventType, build_phases_from_events
+from gaitStructs import build_phases_from_events
 from utils.jsonSerializer import KeypointSerializer
 from Skeletons.halpe_skeleton import HALPE_SKELETON
 from utils.data import extract_keypoints, get_valid_range, trim
-from utils.preprocessing import cubic_interpolate_nan, butterworth_filter, find_minima_maxima
 from visualizeGaitPhases import visualize_gait_phases, print_statistics
 
 # Result metadata
@@ -59,9 +59,18 @@ right_heel = trim(right_heel, valid_indices[0], valid_indices[-1])
 excluded_ranges = get_valid_range(hip, frame_rate)
 
 # Detect gait events
-left_events, right_events = gait_detect_zeni(
-    hip, left_toe, right_toe, left_heel, right_heel,
-    frame_rate=frame_rate,)
+
+# Using Zeni et al. method
+# left_events, right_events = gait_detect_zeni(
+#     hip, left_toe, right_toe, left_heel, right_heel,
+#     frame_rate=frame_rate,)
+
+# Using Ghoussayni et al. method
+left_events, right_events = gait_detect_ghoussayni(
+    left_toe, right_toe, left_heel, right_heel,
+    frame_rate=frame_rate,
+    debug=True
+)
 
 # Calculate gait phases
 l_phases, r_phases, support_phases = build_phases_from_events(
