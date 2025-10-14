@@ -3,6 +3,7 @@ from enum import Enum
 import numpy as np
 
 from gaitDetectors.ghoussayni import gait_detect_ghoussayni
+from gaitDetectors.hsue import gait_detect_hsue
 from gaitDetectors.zeni import gait_detect_zeni
 from gaitStructs import build_phases_from_events
 from utils.jsonSerializer import KeypointSerializer
@@ -50,13 +51,15 @@ right_heel = np.array([coord[0] for coord in right_heel])
 trimmed_range = range(valid_indices[0], valid_indices[-1] + 1)
 trimmed_range_len = trimmed_range.stop - trimmed_range.start
 
+print(f"first_valid {valid_indices[0]}")
+
 hip = trim(hip, valid_indices[0], valid_indices[-1])
 left_toe = trim(left_toe, valid_indices[0], valid_indices[-1])
 right_toe = trim(right_toe, valid_indices[0], valid_indices[-1])
 left_heel = trim(left_heel, valid_indices[0], valid_indices[-1])
 right_heel = trim(right_heel, valid_indices[0], valid_indices[-1])
 
-excluded_ranges = get_valid_range(hip, frame_rate)
+excluded_ranges = get_valid_range(hip, frame_rate, exclude_percent=0.05)
 
 # Detect gait events
 
@@ -66,11 +69,18 @@ excluded_ranges = get_valid_range(hip, frame_rate)
 #     frame_rate=frame_rate,)
 
 # Using Ghoussayni et al. method
-left_events, right_events = gait_detect_ghoussayni(
-    left_toe, right_toe, left_heel, right_heel,
+# left_events, right_events = gait_detect_ghoussayni(
+#     left_toe, right_toe, left_heel, right_heel,
+#     frame_rate=frame_rate,
+#     debug=True)
+
+# Using Hsue et al. method
+left_events, right_events = gait_detect_hsue(
+    hip, left_toe, right_toe, left_heel, right_heel,
     frame_rate=frame_rate,
-    debug=True
-)
+    debug=True)
+
+# TODO: Bonci et al. method
 
 # Calculate gait phases
 l_phases, r_phases, support_phases = build_phases_from_events(
