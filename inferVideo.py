@@ -1,11 +1,10 @@
-import time
 from functools import partial
 
 import cv2
 import numpy as np
 from tqdm import tqdm
 
-from rtmlib import BodyWithFeet, PoseTracker, RTMDet, RTMPose, Custom
+from rtmlib import PoseTracker, Custom
 from utils.jsonSerializer import KeypointSerializer
 
 device = 'cuda'
@@ -34,8 +33,10 @@ tracker = PoseTracker(
     tracking=True,
 )
 
+MIN_BBOX_SIZE = 250
+
 # cap = cv2.VideoCapture("videos/logitech-1920-60-8.avi")  # Video file path
-cap = cv2.VideoCapture("videos/interpolated.mp4")  # Video file path
+cap = cv2.VideoCapture("videos/test_interpolated.mp4")  # Video file path
 tot_frame = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
 file_name = "interpolated"
@@ -50,15 +51,32 @@ while cap.isOpened():
     if not success:
         break
 
-    s = time.time()
     keypoints, scores = tracker(frame)
 
     if len(scores) == 0:
+        frame_idx += 1
         pbar.update(1)
         continue
 
-    total_scores = [sum(s) for s in scores]
-    best_idx = total_scores.index(max(total_scores))
+    valid_detections = []
+
+    # Calculate bbox size and filter oun small detections
+    for i, (kpts, sc) in enumerate(zip(keypoints, scores)):
+        x_min, y_min = np.min(kpts[:, 0]), np.min(kpts[:, 1])
+        x_max, y_max = np.max(kpts[:, 0]), np.max(kpts[:, 1])
+        width, height = x_max - x_min, y_max - y_min
+
+        if height >= MIN_BBOX_SIZE:
+            total_score = float(np.sum(sc))
+            valid_detections.append((i, total_score, (x_min, y_min, x_max, y_max)))
+
+    if not valid_detections:
+        frame_idx += 1
+        pbar.update(1)
+        continue
+
+    # Get the detection with the highest score
+    best_idx, best_score, best_bbox = max(valid_detections, key=lambda x: x[1])
 
     filtered_keypoints = keypoints[np.newaxis, best_idx]
     filtered_scores = scores[np.newaxis, best_idx]
