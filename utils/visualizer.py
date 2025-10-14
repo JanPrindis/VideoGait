@@ -74,7 +74,8 @@ class Visualizer:
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        out = cv2.VideoWriter(output_path_full, -1, fps, (width, height))
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter(output_path_full, fourcc, fps, (width, height))
 
         keypoints = KeypointSerializer.load(
             os.path.join(detector_output_path, detector_output_file)
