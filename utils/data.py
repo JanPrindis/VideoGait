@@ -11,14 +11,13 @@ def extract_keypoints(keypoint_list, index):
     return keypoint_list[index * 3], keypoint_list[index * 3 + 1], keypoint_list[index * 3 + 2]
 
 
-def get_valid_range(hip: np.array, frame_rate: float):
+def get_valid_range(hip: np.array, frame_rate: float, exclude_percent: float = 0.1):
     # Preprocessing
     hip = cubic_interpolate_nan(hip)
     hip_f = butterworth_filter(hip, cutoff=5, order=4, fs=frame_rate)
 
     # Get X movement range of hip
     hip_min, hip_max = min(hip_f), max(hip_f)
-    exclude_percent = 0.1  # 10 %
 
     def contiguous_ranges(indices):
         if not indices:
