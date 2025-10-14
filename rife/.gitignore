@@ -1,0 +1,14 @@
+*.pyc
+*.py~
+*.py#
+
+*.pkl
+output/*
+trained_models/*
+*.mp4
+
+test/
+.idea/
+*.npz
+
+*.zip

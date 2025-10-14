@@ -7,3 +7,5 @@ rich~=14.1.0
 matplotlib~=3.10.6
 scipy~=1.16.2
 rtmlib~=0.0.13
+torch~=2.8.0+cu126
+torchvision~=0.23.0+cu126
