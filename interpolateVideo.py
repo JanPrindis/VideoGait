@@ -68,7 +68,7 @@ def main():
             torch.set_default_tensor_type(torch.cuda.HalfTensor)
 
     # Load model
-    from rife.trained_models.RIFE_HDv3 import Model
+    from rife.train_log.RIFE_HDv3 import Model
     model = Model()
     model.load_model("rife/train_log", -1)
     model.eval()
