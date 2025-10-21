@@ -3,6 +3,12 @@ import numpy as np
 from utils.preprocessing import cubic_interpolate_nan, butterworth_filter
 
 
+def create_folder_if_not_exists(folder_path):
+    import os
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
+
 def trim(data, first_valid, last_valid):
     return data[first_valid:last_valid + 1]
 
