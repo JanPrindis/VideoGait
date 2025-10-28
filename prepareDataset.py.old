@@ -1,0 +1,200 @@
+import json
+import cv2
+import glob
+
+from utils.data import create_folder_if_not_exists
+import numpy as np
+
+l_pred = []
+r_pred = []
+
+LEFT_ANKLE_COLOR = (0, 255, 255) # BGR Yellow
+RIGHT_ANKLE_COLOR = (0, 0, 128)  # BGR Brown
+
+def predict_next_poly(coords, degree=2):
+    coords = np.array(coords)
+    t = np.arange(len(coords))
+
+    # Fit x(t) and y(t) separately
+    px = np.polyfit(t, coords[:,0], degree)
+    py = np.polyfit(t, coords[:,1], degree)
+    next_t = len(coords)
+    x_next = np.polyval(px, next_t)
+    y_next = np.polyval(py, next_t)
+    return x_next, y_next
+
+def process_frame(img, l_ankle, r_ankle, l_p, r_p):
+    out_img = img.copy()
+    if l_ankle is not None:
+        cv2.circle(out_img, (int(l_ankle[0]), int(l_ankle[1])), 10, (255, 0, 0), -1)
+    if r_ankle is not None:
+        cv2.circle(out_img, (int(r_ankle[0]), int(r_ankle[1])), 10, (0, 0, 255), -1)
+
+    if l_p is not None:
+        cv2.circle(out_img, (int(l_p[0]), int(l_p[1])), 10, (255, 255, 0), -1)
+    if r_p is not None:
+        cv2.circle(out_img, (int(r_p[0]), int(r_p[1])), 10, (0, 255, 255), -1)
+
+    ankle_foot_mask = np.isin(img, [LEFT_ANKLE_COLOR, RIGHT_ANKLE_COLOR]).astype(np.uint8)
+    cv2.imshow("Mask", ankle_foot_mask)
+
+    return out_img
+
+
+root_folder_path = "D:/Semestralka/Health_Gait/"
+output_folder_path = "D:/Semestralka/Health_Gait/generated_videos/test"
+create_folder_if_not_exists(output_folder_path)
+
+segmentations = glob.glob(f"{root_folder_path}/semantic_segmentation/PA*")
+segmentations.sort()
+
+keypoints = glob.glob(f"{root_folder_path}/pose/PA*")
+keypoints.sort()
+
+fps = 30
+# fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+
+cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+
+missing_list = []
+
+for video_idx, (seg_path, kpt_path) in enumerate(zip(segmentations, keypoints)):
+    # Get video frames
+    patient_r = glob.glob(f"{seg_path}/UGS/WoJ_1_DensePose/*.png")
+    patient_l = glob.glob(f"{seg_path}/UGS/WoJ_2_DensePose/*.png")
+    patient_r.sort()
+    patient_l.sort()
+
+    if not patient_r or not patient_l:
+        missing_list.append(f"No images found for patient {seg_path}. Skipping.")
+        continue
+
+    # Get keypoints for current patient
+    with open(f"{kpt_path}/UGS/WoJ_1_AlphaPose.json", "r") as f:
+        raw_data_r = json.load(f)
+
+    with open(f"{kpt_path}/UGS/WoJ_2_AlphaPose.json", "r") as f:
+        raw_data_l = json.load(f)
+
+    frame_size = cv2.imread(patient_r[0]).shape[1], cv2.imread(patient_r[0]).shape[0]
+
+    # writer = cv2.VideoWriter(
+    #     f"{output_folder_path}/patient_{i:03d}.mp4",
+    #     fourcc,
+    #     fps,
+    #     frame_size
+    # )
+
+    r_ankle_old = None
+    l_ankle_old = None
+    broken_frames = 0
+
+    for f, frame in enumerate(patient_r):
+        img = cv2.imread(frame)
+
+        frame_num = int(frame.split("\\")[-1].split(".")[0])
+        if raw_data_r[frame_num]['joints'] is not None:
+            if (raw_data_r[frame_num]['joints']['l_ankle'] is not None and
+                    raw_data_r[frame_num]['joints']['r_ankle'] is not None):
+                r_ankle = (raw_data_r[frame_num]['joints']['l_ankle']['x'],
+                           raw_data_r[frame_num]['joints']['l_ankle']['y'])
+                l_ankle = (raw_data_r[frame_num]['joints']['r_ankle']['x'],
+                           raw_data_r[frame_num]['joints']['r_ankle']['y'])
+
+                r_vis = r_ankle
+                l_vis = l_ankle
+
+                pl, pr = None, None
+                dif_tot = 0
+                dif_tot_swapped = 1
+
+                if len(l_pred) >= 10 and len(r_pred) >= 10:
+                    pl = predict_next_poly(l_pred[-10:], degree=2)
+                    pr = predict_next_poly(r_pred[-10:], degree=2)
+
+                    l_dif = (l_ankle[0] - pl[0])**2 + (l_ankle[1] - pl[1])**2
+                    r_dif = (r_ankle[0] - pr[0])**2 + (r_ankle[1] - pr[1])**2
+
+                    l_dif_swapped = (l_ankle[0] - pr[0])**2 + (l_ankle[1] - pr[1])**2
+                    r_dif_swapped = (r_ankle[0] - pl[0])**2 + (r_ankle[1] - pl[1])**2
+
+                    dif_tot = l_dif + r_dif
+                    dif_tot_swapped = l_dif_swapped + r_dif_swapped
+
+                    #print(f"[Video {video_idx}, Frame {f}] Diff: {dif_tot}, Swapped: {dif_tot_swapped}")
+
+                if broken_frames >= 3:
+                    r_ankle_old = r_ankle
+                    l_ankle_old = l_ankle
+                    broken_frames = 0
+
+                if r_ankle_old is None:
+                    r_ankle_old = r_ankle
+                if l_ankle_old is None:
+                    l_ankle_old = l_ankle
+
+                # Calculate shortest delta
+                delta_r_correct = (r_ankle[0] - r_ankle_old[0])**2 + (r_ankle[1] - r_ankle_old[1])**2
+                delta_l_correct = (l_ankle[0] - l_ankle_old[0])**2 + (l_ankle[1] - l_ankle_old[1])**2
+
+                delta_r_swapped = (l_ankle[0] - r_ankle_old[0])**2 + (l_ankle[1] - r_ankle_old[1])**2
+                delta_l_swapped = (r_ankle[0] - l_ankle_old[0])**2 + (r_ankle[1] - l_ankle_old[1])**2
+
+                total_delta_correct = delta_r_correct + delta_l_correct
+                total_delta_swapped = delta_r_swapped + delta_l_swapped
+                horizontal_difference = abs(r_ankle[0] - l_ankle[0])
+
+                #print(f"[Video {video_idx}, Frame {f}] Total delta correct: {total_delta_correct}, swapped: {total_delta_swapped}, x_diff: {horizontal_difference}")
+
+                # Check if legs swapped
+                # if total_delta_swapped < total_delta_correct * 0.5 and horizontal_difference > 20:
+                #     print(f"-- Detected swapped ankles, correcting.")
+                #     r_ankle, l_ankle = l_ankle, r_ankle
+                #     r_vis, l_vis = r_ankle, l_ankle
+
+                if dif_tot_swapped < dif_tot * 0.3 and horizontal_difference > 20:
+                    print(f"[Video {video_idx}, Frame {f}] -- Detected swapped ankles, correcting.")
+                    r_ankle, l_ankle = l_ankle, r_ankle
+                    r_vis, l_vis = r_ankle, l_ankle
+
+                elif total_delta_correct > 5000 and total_delta_swapped > 5000:
+                    print(f"[Video {video_idx}, Frame {f}] -- Failed detection")
+                    r_ankle = r_ankle_old
+                    l_ankle = l_ankle_old
+                    r_vis, l_vis = None, None
+                    broken_frames += 1
+
+                elif delta_l_correct > 5000 and horizontal_difference < 100:
+                    print(f"[Video {video_idx}, Frame {f}] -- Detected right ankle only.")
+                    l_ankle = l_ankle_old
+                    l_vis = None
+                    broken_frames += 1
+
+                elif delta_r_correct > 5000 and horizontal_difference < 100:
+                    print(f"[Video {video_idx}, Frame {f}] -- Detected left ankle only.")
+                    r_ankle = r_ankle_old
+                    r_vis = None
+                    broken_frames += 1
+
+                l_pred.append(l_ankle)
+                r_pred.append(r_ankle)
+
+                r_ankle_old = r_ankle
+                l_ankle_old = l_ankle
+
+                img = process_frame(img, l_vis, r_vis, None, None)
+
+        cv2.imshow("Frame", img)
+        if cv2.waitKey(0) & 0xFF == ord('q'):
+            exit()
+
+        # writer.write(img)
+    l_pred = []
+    r_pred = []
+    # writer.release()
+
+
+print("No images found for the following patients:")
+for msg in missing_list:
+    print(msg)
+
