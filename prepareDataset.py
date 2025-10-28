@@ -168,5 +168,10 @@ if __name__ == "__main__":
         "015_NM_02.MOV", # Corrupted
     ]
 
+    # Fix ONNX not finding CUDA dlls
+    import onnxruntime
+    # Preload DLLs from NVIDIA site packages
+    onnxruntime.preload_dlls(directory="")
+
     # merge_videos(dataset_root_path, blacklist)
     process_videos(dataset_root_path)
