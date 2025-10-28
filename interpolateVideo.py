@@ -88,7 +88,7 @@ def main():
     if args.fps is None:
         args.fps = fps_orig * (2 ** args.exp)
 
-    print(f"Video: {args.video} | {tot_frame} frames | {fps_orig:.2f} FPS → {args.fps:.2f} FPS | Resolution: {width}x{height}")
+    print(f"Video: {args.video} | {tot_frame} frames | {fps_orig:.2f} FPS -> {args.fps:.2f} FPS | Resolution: {width}x{height}")
 
     # Video writer
     out_path = args.output if args.output else os.path.splitext(args.video)[0] + f"_interp.{args.ext}"
@@ -136,6 +136,7 @@ def main():
         last_frame = frame
         pbar.update(1)
 
+    # TODO: Possibly useless
     # Write last frame again
     out_frame = (last_frame[0] * 255).byte().cpu().numpy().transpose(1,2,0)[:height, :width]
     writer.write(cv2.cvtColor(out_frame, cv2.COLOR_RGB2BGR))
