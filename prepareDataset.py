@@ -1,194 +1,172 @@
-import json
+import os
+import shutil
+from glob import glob
 import cv2
-import glob
+from tqdm import tqdm
 
+from Skeletons.halpe_skeleton import HALPE_SKELETON
+from inferVideo import RTMLib
 from utils.data import create_folder_if_not_exists
-import numpy as np
-
-l_pred = []
-r_pred = []
-
-def predict_next_poly(coords, degree=2):
-    coords = np.array(coords)
-    t = np.arange(len(coords))
-
-    # Fit x(t) and y(t) separately
-    px = np.polyfit(t, coords[:,0], degree)
-    py = np.polyfit(t, coords[:,1], degree)
-    next_t = len(coords)
-    x_next = np.polyval(px, next_t)
-    y_next = np.polyval(py, next_t)
-    return x_next, y_next
-
-def process_frame(img, l_ankle, r_ankle, l_p, r_p):
-    out_img = img.copy()
-    if l_ankle is not None:
-        cv2.circle(out_img, (int(l_ankle[0]), int(l_ankle[1])), 10, (255, 0, 0), -1)
-    if r_ankle is not None:
-        cv2.circle(out_img, (int(r_ankle[0]), int(r_ankle[1])), 10, (0, 0, 255), -1)
-
-    if l_p is not None:
-        cv2.circle(out_img, (int(l_p[0]), int(l_p[1])), 10, (255, 255, 0), -1)
-    if r_p is not None:
-        cv2.circle(out_img, (int(r_p[0]), int(r_p[1])), 10, (0, 255, 255), -1)
-
-    return out_img
+from utils.visualizer import Visualizer
 
 
-root_folder_path = "D:/Semestralka/Health_Gait/"
-output_folder_path = "D:/Semestralka/Health_Gait/generated_videos/test"
-create_folder_if_not_exists(output_folder_path)
+def join_videos(first, second, output_path, output_name):
+    create_folder_if_not_exists(output_path)
 
-segmentations = glob.glob(f"{root_folder_path}/semantic_segmentation/PA*")
-segmentations.sort()
+    caps = [cv2.VideoCapture(first), cv2.VideoCapture(second)]
+    tot_frame = int(caps[0].get(cv2.CAP_PROP_FRAME_COUNT)) + int(caps[1].get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = caps[0].get(cv2.CAP_PROP_FPS)
+    width = int(caps[0].get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(caps[0].get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-keypoints = glob.glob(f"{root_folder_path}/pose/PA*")
-keypoints.sort()
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    writer = cv2.VideoWriter(f"{output_path}/{output_name}", fourcc, fps, (width, height))
 
-fps = 30
-# fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    pbar = tqdm(total=tot_frame, leave=False, desc=f"Merging", unit="Frame")
+    for cap in caps:
+        while cap.isOpened():
+            success, frame = cap.read()
 
-cv2.namedWindow("Frame", cv2.WINDOW_NORMAL)
+            if not success:
+                break
 
-missing_list = []
+            writer.write(frame)
+            pbar.update(1)
+        cap.release()
 
-for video_idx, (seg_path, kpt_path) in enumerate(zip(segmentations, keypoints)):
-    # Get video frames
-    patient_r = glob.glob(f"{seg_path}/UGS/WoJ_1_DensePose/*.png")
-    patient_l = glob.glob(f"{seg_path}/UGS/WoJ_2_DensePose/*.png")
-    patient_r.sort()
-    patient_l.sort()
-
-    if not patient_r or not patient_l:
-        missing_list.append(f"No images found for patient {seg_path}. Skipping.")
-        continue
-
-    # Get keypoints for current patient
-    with open(f"{kpt_path}/UGS/WoJ_1_AlphaPose.json", "r") as f:
-        raw_data_r = json.load(f)
-
-    with open(f"{kpt_path}/UGS/WoJ_2_AlphaPose.json", "r") as f:
-        raw_data_l = json.load(f)
-
-    frame_size = cv2.imread(patient_r[0]).shape[1], cv2.imread(patient_r[0]).shape[0]
-
-    # writer = cv2.VideoWriter(
-    #     f"{output_folder_path}/patient_{i:03d}.mp4",
-    #     fourcc,
-    #     fps,
-    #     frame_size
-    # )
-
-    r_ankle_old = None
-    l_ankle_old = None
-    broken_frames = 0
-
-    for f, frame in enumerate(patient_r):
-        img = cv2.imread(frame)
-
-        frame_num = int(frame.split("\\")[-1].split(".")[0])
-        if raw_data_r[frame_num]['joints'] is not None:
-            if (raw_data_r[frame_num]['joints']['l_ankle'] is not None and
-                    raw_data_r[frame_num]['joints']['r_ankle'] is not None):
-                r_ankle = (raw_data_r[frame_num]['joints']['l_ankle']['x'],
-                           raw_data_r[frame_num]['joints']['l_ankle']['y'])
-                l_ankle = (raw_data_r[frame_num]['joints']['r_ankle']['x'],
-                           raw_data_r[frame_num]['joints']['r_ankle']['y'])
-
-                r_vis = r_ankle
-                l_vis = l_ankle
-
-                pl, pr = None, None
-                dif_tot = 0
-                dif_tot_swapped = 1
-
-                if len(l_pred) >= 10 and len(r_pred) >= 10:
-                    pl = predict_next_poly(l_pred[-10:], degree=2)
-                    pr = predict_next_poly(r_pred[-10:], degree=2)
-
-                    l_dif = (l_ankle[0] - pl[0])**2 + (l_ankle[1] - pl[1])**2
-                    r_dif = (r_ankle[0] - pr[0])**2 + (r_ankle[1] - pr[1])**2
-
-                    l_dif_swapped = (l_ankle[0] - pr[0])**2 + (l_ankle[1] - pr[1])**2
-                    r_dif_swapped = (r_ankle[0] - pl[0])**2 + (r_ankle[1] - pl[1])**2
-
-                    dif_tot = l_dif + r_dif
-                    dif_tot_swapped = l_dif_swapped + r_dif_swapped
-
-                    #print(f"[Video {video_idx}, Frame {f}] Diff: {dif_tot}, Swapped: {dif_tot_swapped}")
-
-                if broken_frames >= 3:
-                    r_ankle_old = r_ankle
-                    l_ankle_old = l_ankle
-                    broken_frames = 0
-
-                if r_ankle_old is None:
-                    r_ankle_old = r_ankle
-                if l_ankle_old is None:
-                    l_ankle_old = l_ankle
-
-                # Calculate shortest delta
-                delta_r_correct = (r_ankle[0] - r_ankle_old[0])**2 + (r_ankle[1] - r_ankle_old[1])**2
-                delta_l_correct = (l_ankle[0] - l_ankle_old[0])**2 + (l_ankle[1] - l_ankle_old[1])**2
-
-                delta_r_swapped = (l_ankle[0] - r_ankle_old[0])**2 + (l_ankle[1] - r_ankle_old[1])**2
-                delta_l_swapped = (r_ankle[0] - l_ankle_old[0])**2 + (r_ankle[1] - l_ankle_old[1])**2
-
-                total_delta_correct = delta_r_correct + delta_l_correct
-                total_delta_swapped = delta_r_swapped + delta_l_swapped
-                horizontal_difference = abs(r_ankle[0] - l_ankle[0])
-
-                #print(f"[Video {video_idx}, Frame {f}] Total delta correct: {total_delta_correct}, swapped: {total_delta_swapped}, x_diff: {horizontal_difference}")
-
-                # Check if legs swapped
-                # if total_delta_swapped < total_delta_correct * 0.5 and horizontal_difference > 20:
-                #     print(f"-- Detected swapped ankles, correcting.")
-                #     r_ankle, l_ankle = l_ankle, r_ankle
-                #     r_vis, l_vis = r_ankle, l_ankle
-
-                if dif_tot_swapped < dif_tot * 0.3 and horizontal_difference > 20:
-                    print(f"[Video {video_idx}, Frame {f}] -- Detected swapped ankles, correcting.")
-                    r_ankle, l_ankle = l_ankle, r_ankle
-                    r_vis, l_vis = r_ankle, l_ankle
-
-                elif total_delta_correct > 5000 and total_delta_swapped > 5000:
-                    print(f"[Video {video_idx}, Frame {f}] -- Failed detection")
-                    r_ankle = r_ankle_old
-                    l_ankle = l_ankle_old
-                    r_vis, l_vis = None, None
-                    broken_frames += 1
-
-                elif delta_l_correct > 5000 and horizontal_difference < 100:
-                    print(f"[Video {video_idx}, Frame {f}] -- Detected right ankle only.")
-                    l_ankle = l_ankle_old
-                    l_vis = None
-                    broken_frames += 1
-
-                elif delta_r_correct > 5000 and horizontal_difference < 100:
-                    print(f"[Video {video_idx}, Frame {f}] -- Detected left ankle only.")
-                    r_ankle = r_ankle_old
-                    r_vis = None
-                    broken_frames += 1
-
-                l_pred.append(l_ankle)
-                r_pred.append(r_ankle)
-
-                r_ankle_old = r_ankle
-                l_ankle_old = l_ankle
-
-                img = process_frame(img, l_vis, r_vis, None, None)
-
-        cv2.imshow("Frame", img)
-        if cv2.waitKey(10) & 0xFF == ord('q'):
-            exit()
-
-        # writer.write(img)
-    l_pred = []
-    r_pred = []
-    # writer.release()
+    pbar.close()
+    writer.release()
 
 
-print("No images found for the following patients:")
-for msg in missing_list:
-    print(msg)
+def parse_filename(filename):
+    base = os.path.basename(filename).replace(".MOV", "")
+    parts = base.split("_")
 
+    patient_id = parts[0]
+    disease_type = parts[1]
+    direction = parts[2]  # 01 / 02
+
+    severity = None
+    if len(parts) > 3:
+        severity = parts[3]
+
+    return patient_id, disease_type, direction, severity
+
+
+def merge_videos(dataset_root_path, blacklist=None):
+    all_videos = glob(f"{dataset_root_path}/**/*.MOV", recursive=True)
+
+    # Filter out blacklisted videos
+    blacklist = set(blacklist or [])
+    all_videos = [v for v in all_videos if not any(bad in os.path.basename(v) for bad in blacklist)]
+
+    pairs = {}
+    message_log = []
+
+    for vid in all_videos:
+        patient_id, dtype, direction, severity = parse_filename(vid)
+        key = (patient_id, dtype, severity)
+
+        if key not in pairs:
+            pairs[key] = {}
+
+        pairs[key][direction] = vid
+
+    total = len(pairs)
+    pbar = tqdm(total=total, desc="Processing videos", unit="Patient")
+
+    for (pid, dtype, sev), dct in pairs.items():
+        out_dir = os.path.join(dataset_root_path, "MERGED", dtype)
+        os.makedirs(out_dir, exist_ok=True)
+
+        suffix = f"{sev}" if sev else ""
+
+        if "01" in dct and "02" in dct:
+            # Merge
+            out_name = f"{pid}_{suffix}.mp4"
+            join_videos(dct["01"], dct["02"], out_dir, out_name)
+
+        elif "01" in dct:
+            out_name = f"{pid}_{suffix}_01.mp4"
+            shutil.copy(dct["01"], os.path.join(out_dir, out_name))
+            message_log.append(f"[SingleCopy] {pid} {dtype} {sev}")
+
+        elif "02" in dct:
+            out_name = f"{pid}_{suffix}_02.mp4"
+            shutil.copy(dct["02"], os.path.join(out_dir, out_name))
+            message_log.append(f"[SingleCopy] {pid} {dtype} {sev}")
+
+        else:
+            message_log.append(f"Something went terribly wrong for {pid} {dtype} {sev}")
+
+        pbar.update(1)
+
+    pbar.close()
+
+    if message_log:
+        print("Log:")
+        for msg in message_log:
+            print(msg)
+
+
+def process_videos(dataset_root_path):
+    merged_dir = os.path.join(dataset_root_path, "MERGED")
+    keypoint_root = os.path.join(dataset_root_path, "PROCESSED", "KEYPOINTS")
+    annotated_root = os.path.join(dataset_root_path, "PROCESSED", "ANNOTATED")
+
+    create_folder_if_not_exists(keypoint_root)
+    create_folder_if_not_exists(annotated_root)
+
+    rtmlib = RTMLib()
+    vis = Visualizer(skeleton_definition=HALPE_SKELETON)
+
+    all_videos = glob(f"{merged_dir}/**/*.mp4", recursive=True)
+    pbar = tqdm(all_videos, desc="Running inference", unit="video")
+
+    for video_path in pbar:
+        rel_dir = os.path.relpath(os.path.dirname(video_path), merged_dir)
+        base_name = os.path.splitext(os.path.basename(video_path))[0]
+
+        # Output paths
+        keypoint_dir = os.path.join(keypoint_root, rel_dir)
+        annotated_dir = os.path.join(annotated_root, rel_dir)
+        create_folder_if_not_exists(keypoint_dir)
+        create_folder_if_not_exists(annotated_dir)
+
+        json_name = f"{base_name}.json"
+        annotated_name = f"{base_name}.mp4"
+
+        # Infer
+        pbar.set_description(f"Infer: {base_name}")
+        try:
+            rtmlib.inferVideo(in_path=video_path, out_path=keypoint_dir)
+        except Exception as e:
+            print(f"[ERROR] Failed inference for {video_path}: {e}")
+            continue
+
+        # Visualization
+        pbar.set_description(f"Annotate: {base_name}")
+        try:
+            vis.visualize(
+                original_video=video_path,
+                visualizer_output_path=annotated_dir,
+                visualizer_output_file=annotated_name,
+                detector_output_path=keypoint_dir,
+                detector_output_file=json_name,
+                confidence_threshold=0.6
+            )
+        except Exception as e:
+            print(f"[ERROR] Failed visualization for {video_path}: {e}")
+
+    pbar.close()
+
+
+if __name__ == "__main__":
+    dataset_root_path = ""
+    blacklist = [
+        "004_NM_01.MOV", # Bad crop
+        "015_NM_02.MOV", # Corrupted
+    ]
+
+    # merge_videos(dataset_root_path, blacklist)
+    process_videos(dataset_root_path)
