@@ -166,6 +166,12 @@ if __name__ == "__main__":
     blacklist = [
         "004_NM_01.MOV", # Bad crop
         "015_NM_02.MOV", # Corrupted
+
+        "001_PD_01_SV.MOV", # The detection fails if there are multiple people walking,
+        "001_PD_02_SV.MOV", # so patients with severe Parkinson's Disease are excluded
+        "002_PD_01_SV.MOV", #
+        "003_PD_01_SV.MOV", #
+        "003_PD_02_SV.MOV", #
     ]
 
     # merge_videos(dataset_root_path, blacklist)
