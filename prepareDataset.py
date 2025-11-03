@@ -164,6 +164,7 @@ def process_videos(dataset_root_path):
 if __name__ == "__main__":
     dataset_root_path = ""
     blacklist = [
+        "002_NM_01.MOV", # Bad crop
         "004_NM_01.MOV", # Bad crop
         "015_NM_02.MOV", # Corrupted
 
