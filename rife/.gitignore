@@ -3,8 +3,7 @@
 *.py#
 
 *.pkl
-output/*
-trained_models/*
+train_log/*.py
 *.mp4
 
 test/
