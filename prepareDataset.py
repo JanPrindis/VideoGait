@@ -7,12 +7,11 @@ from tqdm import tqdm
 from Skeletons.halpe_skeleton import HALPE_SKELETON
 from rtmlib.infer import RTMLib
 from upsample import RIFE_interpolate
-from utils.data import create_folder_if_not_exists
 from utils.visualizer import Visualizer
 
 
 def join_videos(first, second, output_path, output_name):
-    create_folder_if_not_exists(output_path)
+    os.makedirs(output_path, exist_ok=True)
 
     caps = [cv2.VideoCapture(first), cv2.VideoCapture(second)]
     tot_frame = int(caps[0].get(cv2.CAP_PROP_FRAME_COUNT)) + int(caps[1].get(cv2.CAP_PROP_FRAME_COUNT))
@@ -114,7 +113,7 @@ def upsample_videos(dataset_root_path):
     merged_dir = os.path.join(dataset_root_path, "MERGED")
     original_dir = os.path.join(merged_dir, "ORIGINAL")
     upsampled_dir = os.path.join(merged_dir, "UPSAMPLED")
-    create_folder_if_not_exists(upsampled_dir)
+    os.makedirs(upsampled_dir, exist_ok=True)
 
     all_videos = glob(f"{original_dir}/**/*.mp4", recursive=True)
 
@@ -125,6 +124,8 @@ def upsample_videos(dataset_root_path):
         base_name = os.path.splitext(os.path.basename(video_path))[0]
 
         out_path = os.path.join(upsampled_dir, rel_dir)
+        os.makedirs(out_path, exist_ok=True)
+
         out_file = os.path.join(out_path, f'{base_name}_120.mp4')
 
         RIFE_interpolate(
@@ -155,8 +156,8 @@ def process_videos(dataset_root_path, detector, visualizer):
             # Output structure:
             keypoint_dir = os.path.join(processed_root, mode, rel_dir, "KEYPOINTS")
             annotated_dir = os.path.join(processed_root, mode, rel_dir, "ANNOTATED")
-            create_folder_if_not_exists(keypoint_dir)
-            create_folder_if_not_exists(annotated_dir)
+            os.makedirs(keypoint_dir, exist_ok=True)
+            os.makedirs(annotated_dir, exist_ok=True)
 
             base_name = os.path.splitext(os.path.basename(video_path))[0]
             json_name = f"{base_name}.json"
