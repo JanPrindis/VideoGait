@@ -3,7 +3,8 @@ import sys
 import cv2
 import torch
 import numpy as np
-import argparse
+
+from matplotlib.pyplot import title
 from torch.nn import functional as F
 from tqdm import tqdm
 from rife.model.pytorch_msssim import ssim_matlab
@@ -17,7 +18,7 @@ for alias, dtype in [('float', float), ('int', int), ('bool', bool), ('object', 
         setattr(np, alias, dtype)
 
 # Video reader replacement
-def read_video_frames(video_path):
+def _read_video_frames(video_path):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise IOError(f"Cannot open video file: {video_path}")
@@ -29,34 +30,59 @@ def read_video_frames(video_path):
     cap.release()
 
 # Padding helper
-def pad_image(img, padding, fp16=False):
+def _pad_image(img, padding, fp16=False):
     img = F.pad(img, padding)
     return img.half() if fp16 else img
 
 # Frame interpolation
-def make_inference(model, I0, I1, n, scale):
+def _make_inference(model, I0, I1, n, scale):
     if n == 1:
         mid = model.inference(I0, I1, scale)
         return [mid]
     middle = model.inference(I0, I1, scale)
-    first_half = make_inference(model, I0, middle, n=n//2, scale=scale)
-    second_half = make_inference(model, middle, I1, n=n//2, scale=scale)
+    first_half = _make_inference(model, I0, middle, n=n // 2, scale=scale)
+    second_half = _make_inference(model, middle, I1, n=n // 2, scale=scale)
     if n % 2:
         return [*first_half, middle, *second_half]
     else:
         return [*first_half, *second_half]
 
-# MAIN
-def main():
-    parser = argparse.ArgumentParser(description="Video interpolation using RIFE HDv3")
-    parser.add_argument("--video", type=str, required=True)
-    parser.add_argument("--output", type=str, default=None)
-    parser.add_argument("--exp", type=int, default=1)
-    parser.add_argument("--fps", type=float, default=None)
-    parser.add_argument("--scale", type=float, default=1.0)
-    parser.add_argument("--fp16", action='store_true')
-    parser.add_argument("--ext", type=str, default="mp4")
-    args = parser.parse_args()
+
+def RIFE_interpolate(
+    video: str,
+    output: str = None,
+    exp: int = 1,
+    fps: float = None,
+    scale: float = 1.0,
+    fp16: bool = False,
+    ext: str = "mp4"
+):
+    """
+    Video interpolation using RIFE HDv3
+
+    Parameters
+    ----------
+    video : str
+        Path to input video
+    output : str, optional
+        Output file path, default: None (auto based on input)
+    exp : int, optional
+        Interpolation exponent, default: 1
+    fps : float, optional
+        Override output FPS, default: None
+    scale : float, optional
+        Image scaling factor, default: 1.0
+    fp16 : bool, optional
+        Enable FP16 inference, default: False
+    ext : str, optional
+        Output file extension, default: "mp4"
+    """
+
+    # If output isn't provided, derive from input
+    if output is None:
+        import os
+        base, _ = os.path.splitext(video)
+        output = f"{base}_RIFE.{ext}"
 
     # Device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -64,7 +90,7 @@ def main():
     if torch.cuda.is_available():
         torch.backends.cudnn.enabled = True
         torch.backends.cudnn.benchmark = True
-        if args.fp16:
+        if fp16:
             torch.set_default_tensor_type(torch.cuda.HalfTensor)
 
     # Load model
@@ -73,48 +99,47 @@ def main():
     model.load_model("rife/train_log", -1)
     model.eval()
     model.device()
-    print("Loaded RIFE HDv3 model.")
 
     # Video info
-    cap = cv2.VideoCapture(args.video)
+    cap = cv2.VideoCapture(video)
     if not cap.isOpened():
-        raise IOError(f"Cannot open video file: {args.video}")
+        raise IOError(f"Cannot open video file: {video}")
     fps_orig = cap.get(cv2.CAP_PROP_FPS)
     tot_frame = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     cap.release()
 
-    if args.fps is None:
-        args.fps = fps_orig * (2 ** args.exp)
+    if fps is None:
+        fps = fps_orig * (2 ** exp)
 
-    print(f"Video: {args.video} | {tot_frame} frames | {fps_orig:.2f} FPS -> {args.fps:.2f} FPS | Resolution: {width}x{height}")
+    # print(f"Video: {args.video} | {tot_frame} frames | {fps_orig:.2f} FPS -> {args.fps:.2f} FPS | Resolution: {width}x{height}")
 
     # Video writer
-    out_path = args.output if args.output else os.path.splitext(args.video)[0] + f"_interp.{args.ext}"
+    out_path = output if output else os.path.splitext(video)[0] + f"_interp.{ext}"
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    writer = cv2.VideoWriter(out_path, fourcc, args.fps, (width, height))
+    writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
 
     # Padding
-    tmp = max(32, int(32 / args.scale))
+    tmp = max(32, int(32 / scale))
     ph = ((height - 1) // tmp + 1) * tmp
     pw = ((width - 1) // tmp + 1) * tmp
     padding = (0, pw - width, 0, ph - height)
 
     # Video generator
-    videogen = read_video_frames(args.video)
+    videogen = _read_video_frames(video)
     last_frame_np = next(videogen)
     last_frame = torch.from_numpy(np.transpose(last_frame_np, (2,0,1))).to(device).unsqueeze(0).float() / 255.
-    last_frame = pad_image(last_frame, padding, args.fp16)
+    last_frame = _pad_image(last_frame, padding, fp16)
 
-    pbar = tqdm(total=tot_frame-1)
+    pbar = tqdm(desc=f"{fps_orig} -> {fps}", total=tot_frame-1, leave=False)
 
     # Frame processing loop
     for frame_np in videogen:
         frame = torch.from_numpy(np.transpose(frame_np, (2,0,1))).to(device).unsqueeze(0).float() / 255.
-        frame = pad_image(frame, padding, args.fp16)
+        frame = _pad_image(frame, padding, fp16)
 
-        # Optional: skip almost identical frames
+        # Skip almost identical frames
         I0_small = F.interpolate(last_frame, (32,32), mode='bilinear', align_corners=False)
         I1_small = F.interpolate(frame, (32,32), mode='bilinear', align_corners=False)
         ssim = ssim_matlab(I0_small[:, :3], I1_small[:, :3])
@@ -122,9 +147,9 @@ def main():
         if ssim > 0.996:
             interp_frames = []
         else:
-            interp_frames = make_inference(model, last_frame, frame, n=(2**args.exp-1), scale=args.scale)
+            interp_frames = _make_inference(model, last_frame, frame, n=(2 ** exp - 1), scale=scale)
 
-        # Write last frame
+        # Write frame
         out_frame = (last_frame[0] * 255).byte().cpu().numpy().transpose(1,2,0)[:height, :width]
         writer.write(cv2.cvtColor(out_frame, cv2.COLOR_RGB2BGR))
 
@@ -136,14 +161,11 @@ def main():
         last_frame = frame
         pbar.update(1)
 
-    # TODO: Possibly useless
-    # Write last frame again
+    # Write last frame
     out_frame = (last_frame[0] * 255).byte().cpu().numpy().transpose(1,2,0)[:height, :width]
     writer.write(cv2.cvtColor(out_frame, cv2.COLOR_RGB2BGR))
 
     writer.release()
     pbar.close()
-    print(f"Finished. Output saved to {out_path}")
+    #print(f"Finished. Output saved to {out_path}")
 
-if __name__ == "__main__":
-    main()
