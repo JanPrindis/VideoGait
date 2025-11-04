@@ -5,7 +5,8 @@ import cv2
 from tqdm import tqdm
 
 from Skeletons.halpe_skeleton import HALPE_SKELETON
-from inferVideo import RTMLib
+from rtmlib.infer import RTMLib
+from upsample import RIFE_interpolate
 from utils.data import create_folder_if_not_exists
 from utils.visualizer import Visualizer
 
@@ -76,7 +77,7 @@ def merge_videos(dataset_root_path, blacklist=None):
     pbar = tqdm(total=total, desc="Processing videos", unit="Patient")
 
     for (pid, dtype, sev), dct in pairs.items():
-        out_dir = os.path.join(dataset_root_path, "MERGED", dtype)
+        out_dir = os.path.join(dataset_root_path, "MERGED", "ORIGINAL", dtype)
         os.makedirs(out_dir, exist_ok=True)
 
         suffix = f"{sev}" if sev else ""
@@ -109,56 +110,79 @@ def merge_videos(dataset_root_path, blacklist=None):
             print(msg)
 
 
-def process_videos(dataset_root_path):
+def upsample_videos(dataset_root_path):
     merged_dir = os.path.join(dataset_root_path, "MERGED")
-    keypoint_root = os.path.join(dataset_root_path, "PROCESSED", "KEYPOINTS")
-    annotated_root = os.path.join(dataset_root_path, "PROCESSED", "ANNOTATED")
+    original_dir = os.path.join(merged_dir, "ORIGINAL")
+    upsampled_dir = os.path.join(merged_dir, "UPSAMPLED")
+    create_folder_if_not_exists(upsampled_dir)
 
-    create_folder_if_not_exists(keypoint_root)
-    create_folder_if_not_exists(annotated_root)
+    all_videos = glob(f"{original_dir}/**/*.mp4", recursive=True)
 
-    rtmlib = RTMLib()
-    vis = Visualizer(skeleton_definition=HALPE_SKELETON)
-
-    all_videos = glob(f"{merged_dir}/**/*.mp4", recursive=True)
-    pbar = tqdm(all_videos, desc="Running inference", unit="video")
+    pbar = tqdm(all_videos, desc="Upsampling videos", unit="video")
 
     for video_path in pbar:
-        rel_dir = os.path.relpath(os.path.dirname(video_path), merged_dir)
+        rel_dir = os.path.relpath(os.path.dirname(video_path), original_dir)
         base_name = os.path.splitext(os.path.basename(video_path))[0]
 
-        # Output paths
-        keypoint_dir = os.path.join(keypoint_root, rel_dir)
-        annotated_dir = os.path.join(annotated_root, rel_dir)
-        create_folder_if_not_exists(keypoint_dir)
-        create_folder_if_not_exists(annotated_dir)
+        out_path = os.path.join(upsampled_dir, rel_dir)
+        out_file = os.path.join(out_path, f'{base_name}_120.mp4')
 
-        json_name = f"{base_name}.json"
-        annotated_name = f"{base_name}.mp4"
+        RIFE_interpolate(
+            video=video_path,
+            output=out_file,
+            fps=120,
+            ext="mp4"
+        )
 
-        # Infer
-        pbar.set_description(f"Infer: {base_name}")
-        try:
-            rtmlib.inferVideo(in_path=video_path, out_path=keypoint_dir)
-        except Exception as e:
-            print(f"[ERROR] Failed inference for {video_path}: {e}")
-            continue
 
-        # Visualization
-        pbar.set_description(f"Annotate: {base_name}")
-        try:
-            vis.visualize(
-                original_video=video_path,
-                visualizer_output_path=annotated_dir,
-                visualizer_output_file=annotated_name,
-                detector_output_path=keypoint_dir,
-                detector_output_file=json_name,
-                confidence_threshold=0.6
-            )
-        except Exception as e:
-            print(f"[ERROR] Failed visualization for {video_path}: {e}")
+def process_videos(dataset_root_path, detector, visualizer):
+    merged_dir = os.path.join(dataset_root_path, "MERGED")
+    processed_root = os.path.join(dataset_root_path, "PROCESSED")
 
-    pbar.close()
+    modes = ["ORIGINAL", "UPSAMPLED"]
+
+    for mode in modes:
+        input_dir = os.path.join(merged_dir, mode)
+
+        # Get all videos only in this mode
+        all_videos = glob(f"{input_dir}/**/*.mp4", recursive=True)
+        pbar = tqdm(all_videos, desc=f"Running inference ({mode})", unit="video")
+
+        for video_path in pbar:
+            # Relative path including KOA/NM/PD
+            rel_dir = os.path.relpath(os.path.dirname(video_path), input_dir)
+
+            # Output structure:
+            keypoint_dir = os.path.join(processed_root, mode, rel_dir, "KEYPOINTS")
+            annotated_dir = os.path.join(processed_root, mode, rel_dir, "ANNOTATED")
+            create_folder_if_not_exists(keypoint_dir)
+            create_folder_if_not_exists(annotated_dir)
+
+            base_name = os.path.splitext(os.path.basename(video_path))[0]
+            json_name = f"{base_name}.json"
+            annotated_name = f"{base_name}.mp4"
+
+            # Inference
+            try:
+                detector.detect(video_path=video_path, output_path=keypoint_dir)
+            except Exception as e:
+                print(f"[ERROR] Inference failed for {video_path}: {e}")
+                continue
+
+            # Visualization
+            try:
+                visualizer.visualize(
+                    original_video=video_path,
+                    visualizer_output_path=annotated_dir,
+                    visualizer_output_file=annotated_name,
+                    detector_output_path=keypoint_dir,
+                    detector_output_file=json_name,
+                    confidence_threshold=0.6
+                )
+            except Exception as e:
+                print(f"[ERROR] Visualization failed for {video_path}: {e}")
+
+        pbar.close()
 
 
 if __name__ == "__main__":
@@ -180,5 +204,14 @@ if __name__ == "__main__":
     # Preload DLLs from NVIDIA site packages
     onnxruntime.preload_dlls(directory="")
 
-    # merge_videos(dataset_root_path, blacklist)
-    process_videos(dataset_root_path)
+    merge_videos(dataset_root_path, blacklist)
+    upsample_videos(dataset_root_path)
+
+    rtmlib = RTMLib()
+    vis = Visualizer(skeleton_definition=HALPE_SKELETON)
+
+    process_videos(
+        dataset_root_path,
+        detector=rtmlib,
+        visualizer=vis
+    )
