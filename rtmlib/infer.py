@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-from rtmlib import PoseTracker, Custom
+from . import PoseTracker, Custom
 from utils.jsonSerializer import KeypointSerializer
 from utils.data import create_folder_if_not_exists
 
@@ -39,14 +39,14 @@ class RTMLib:
 
         self.MIN_BBOX_SIZE = 250
 
-    def inferVideo(self, in_path, out_path):
-        create_folder_if_not_exists(out_path)
+    def detect(self, video_path, output_path):
+        create_folder_if_not_exists(output_path)
 
-        cap = cv2.VideoCapture(in_path)  # Video file path
+        cap = cv2.VideoCapture(video_path)  # Video file path
         tot_frame = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        file_name = path.basename(in_path).split(".")[0]
-        serializer = KeypointSerializer(out_path, f"{file_name}.json")
+        file_name = path.basename(video_path).split(".")[0]
+        serializer = KeypointSerializer(output_path, f"{file_name}.json")
 
         pbar = tqdm(total=tot_frame, leave=False, desc=f"Current video progress")
 
