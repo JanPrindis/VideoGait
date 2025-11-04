@@ -60,6 +60,10 @@ class GaitAnnotator:
                 self.save_annotations()
                 break
 
+            elif key == 3014656: # DEL
+                print("Exiting without saving")
+                break
+
             elif key == 2424832:  # left arrow
                 self.current_frame = max(0, self.current_frame - 1)
 
