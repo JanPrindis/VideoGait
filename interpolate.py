@@ -118,6 +118,8 @@ def RIFE_interpolate(
 
     # Video writer
     out_path = output if output else os.path.splitext(video)[0] + f"_interp.{ext}"
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
 
