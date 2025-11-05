@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 from Skeletons.halpe_skeleton import HALPE_SKELETON
 from rtmlib.infer import RTMLib
-from upsample import RIFE_interpolate
+from interpolate import RIFE_interpolate
 from utils.data import create_folder_if_not_exists
 from utils.visualizer import Visualizer
 
@@ -127,12 +127,29 @@ def upsample_videos(dataset_root_path):
         out_path = os.path.join(upsampled_dir, rel_dir)
         out_file = os.path.join(out_path, f'{base_name}_120.mp4')
 
-        RIFE_interpolate(
-            video=video_path,
-            output=out_file,
-            fps=120,
-            ext="mp4"
-        )
+        cap = cv2.VideoCapture(video_path)
+        original_fps = cap.get(cv2.CAP_PROP_FPS)
+        cap.release()
+
+        if int(original_fps) == 30:
+            RIFE_interpolate(
+                video=video_path,
+                output=out_file,
+                exp=2,
+                ext="mp4"
+            )
+
+        if int(original_fps) == 50:
+            temp_file = os.path.join(out_path, f'temp.mp4')
+            RIFE_interpolate(
+                video=video_path,
+                output=temp_file,
+                exp=1,
+                ext="mp4"
+            )
+
+            #TODO: Minterpolate 100->120, remove temp
+
 
 
 def process_videos(dataset_root_path, detector, visualizer):

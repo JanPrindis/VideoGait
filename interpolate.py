@@ -1,4 +1,5 @@
 import os
+import subprocess
 import sys
 import cv2
 import torch
@@ -169,3 +170,29 @@ def RIFE_interpolate(
     pbar.close()
     #print(f"Finished. Output saved to {out_path}")
 
+
+def interpolate_minterpolate(input_video, output_video, target_fps=120):
+    """
+    Interpolates a video to a target FPS using FFmpeg's minterpolate filter.
+
+    Args:
+        input_video (str): Path to the input video file.
+        output_video (str): Path to the output video file.
+        target_fps (int): The desired output FPS.
+    """
+    command = [
+        'ffmpeg',
+        '-i', input_video,
+        '-vf', f'minterpolate=fps={target_fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir',
+        '-c:v', 'libx264',      # Or your preferred codec
+        '-crf', '18',           # Adjust CRF for quality (lower is better)
+        '-preset', 'slow',      # Adjust preset for speed/quality tradeoff
+        output_video
+    ]
+
+    try:
+        subprocess.run(command, check=True, capture_output=True, text=True)
+        print(f"Successfully interpolated {input_video} to {output_video}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error interpolating {input_video}:")
+        print(e.stderr)
