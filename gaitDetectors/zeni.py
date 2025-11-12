@@ -1,6 +1,6 @@
 from typing import List, Tuple
 from gaitStructs import GaitEvent, GaitEventType
-from utils.preprocessing import cubic_interpolate_nan, butterworth_filter, find_minima_maxima
+from utils.data import cubic_interpolate_nan, butterworth_filter, find_minima_maxima
 
 import numpy as np
 

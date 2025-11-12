@@ -4,8 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from gaitStructs import GaitEvent, GaitEventType
-from utils.preprocessing import cubic_interpolate_nan, butterworth_filter, find_minima_maxima
-from scipy.signal import savgol_filter
+from utils.data import cubic_interpolate_nan, butterworth_filter, find_minima_maxima
 
 
 def gait_detect_hsue(

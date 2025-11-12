@@ -4,7 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from gaitStructs import GaitEvent, GaitEventType
-from utils.preprocessing import cubic_interpolate_nan, butterworth_filter
+from utils.data import cubic_interpolate_nan, butterworth_filter
 
 
 def gait_detect_ghoussayni(
