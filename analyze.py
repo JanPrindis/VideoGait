@@ -8,44 +8,28 @@ from gaitDetectors.zeni import gait_detect_zeni
 from gaitStructs import build_phases_from_events
 from utils.jsonSerializer import KeypointSerializer
 from Skeletons.halpe_skeleton import HALPE_SKELETON
-from utils.data import extract_keypoints, get_valid_range, trim
+from utils.data import get_valid_range, trim, get_keypoints
 from visualizeGaitPhases import visualize_gait_phases, print_statistics
 
 # Result metadata
 result_name = "test"
-json = KeypointSerializer.load(f"results/{result_name}.json")
-frame_rate = 60
-total_frames = len(json)
+json_path = f"results/{result_name}.json"
 
-valid_indices = []
-hip = [(None, None, None)] * total_frames
-left_toe = [(None, None, None)] * total_frames
-right_toe = [(None, None, None)] * total_frames
-left_heel = [(None, None, None)] * total_frames
-right_heel = [(None, None, None)] * total_frames
-confidence_threshold = 0.5
+frame_rate = 60
+# total_frames = len(json)
 
 # Extract required keypoints
-for i, frame_data in enumerate(json):
-
-    # Check if any keypoint is under the confidence threshold
-    if any([conf < confidence_threshold for conf in frame_data["keypoints"][2::3]]):
-        continue
-
-    valid_indices.append(i)
-    keypoints = frame_data["keypoints"]
-    hip[i] = extract_keypoints(keypoints, HALPE_SKELETON.keypoints["HIP"])
-    left_toe[i] = extract_keypoints(keypoints, HALPE_SKELETON.keypoints["LEFT_FOOT_INDEX"])
-    right_toe[i] = extract_keypoints(keypoints, HALPE_SKELETON.keypoints["RIGHT_FOOT_INDEX"])
-    left_heel[i] = extract_keypoints(keypoints, HALPE_SKELETON.keypoints["LEFT_HEEL"])
-    right_heel[i] = extract_keypoints(keypoints, HALPE_SKELETON.keypoints["RIGHT_HEEL"])
+required_keypoints = ["HIP", "LEFT_FOOT_INDEX", "RIGHT_FOOT_INDEX", "LEFT_HEEL", "RIGHT_HEEL"]
+extracted_keypoints, valid_indices = get_keypoints(json_path, HALPE_SKELETON, required_keypoints, confidence_threshold=0.5)
 
 # Convert to numpy arrays for easier manipulation
-hip = np.array([coord[0] for coord in hip])
-left_toe = np.array([coord[0] for coord in left_toe])
-right_toe = np.array([coord[0] for coord in right_toe])
-left_heel = np.array([coord[0] for coord in left_heel])
-right_heel = np.array([coord[0] for coord in right_heel])
+hip = np.array([coord[0] for coord in extracted_keypoints["HIP"]])
+left_toe = np.array([coord[0] for coord in extracted_keypoints["LEFT_FOOT_INDEX"]])
+right_toe = np.array([coord[0] for coord in extracted_keypoints["RIGHT_FOOT_INDEX"]])
+left_heel = np.array([coord[0] for coord in extracted_keypoints["LEFT_HEEL"]])
+right_heel = np.array([coord[0] for coord in extracted_keypoints["RIGHT_HEEL"]])
+
+total_frames = len(hip)
 
 # Trim
 trimmed_range = range(valid_indices[0], valid_indices[-1] + 1)
@@ -59,7 +43,7 @@ right_toe = trim(right_toe, valid_indices[0], valid_indices[-1])
 left_heel = trim(left_heel, valid_indices[0], valid_indices[-1])
 right_heel = trim(right_heel, valid_indices[0], valid_indices[-1])
 
-excluded_ranges = get_valid_range(hip, frame_rate, exclude_percent=0.05)
+valid_ranges = get_valid_range(hip, frame_rate, exclude_percent=0.05)
 
 # Detect gait events
 
@@ -85,7 +69,7 @@ left_events, right_events = gait_detect_hsue(
 # Calculate gait phases
 l_phases, r_phases, support_phases = build_phases_from_events(
     left_events, right_events,
-    excluded_ranges, total_frames, valid_indices[0])
+    valid_ranges, total_frames, valid_indices[0])
 
 # Visualize
 print_statistics(l_phases, r_phases, support_phases)
