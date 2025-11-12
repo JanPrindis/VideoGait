@@ -106,10 +106,10 @@ def compute_support_phases(left_phases, right_phases, total_frames):
     return [ph for ph in phases if ph.support_type != SupportType.UNKNOWN]
 
 
-def build_phases_from_events(left_events, right_events, excluded_ranges, total_frames, start_offset):
+def build_phases_from_events(left_events, right_events, valid_ranges, total_frames, start_offset):
 
-    def in_excluded(i: int) -> bool:
-        return any(start <= i <= end for start, end in excluded_ranges)
+    def get_range_for_frame(frame: int) -> tuple[int, int] | None:
+        return next(((s, e) for s, e in valid_ranges if s <= frame <= e), None)
 
     def build_phases_for_leg(events: list[GaitEvent], leg: Leg) -> list[GaitPhase]:
         phases = []
@@ -118,21 +118,6 @@ def build_phases_from_events(left_events, right_events, excluded_ranges, total_f
 
         for event in sorted(events, key=lambda e: e.frame):
             i = event.frame
-
-            # Skip excluded regions
-            if in_excluded(i):
-                if current_phase != PhaseType.UNKNOWN:
-                    # End current phase as invalid
-                    phases.append(GaitPhase(
-                        leg, current_phase,
-                        phase_start + start_offset,
-                        i - 1 + start_offset,
-                        i - phase_start,
-                        valid=False
-                    ))
-                    current_phase = PhaseType.UNKNOWN
-                    phase_start = None
-                continue
 
             # Event to phase translation
             if event.event_type == GaitEventType.HEEL_STRIKE:
@@ -144,32 +129,49 @@ def build_phases_from_events(left_events, right_events, excluded_ranges, total_f
 
             # Start of first phase or change
             if new_phase != current_phase:
+                # Check if the event frame is within a valid range
+                event_range = get_range_for_frame(i)
+
                 # End previous phase
                 if current_phase != PhaseType.UNKNOWN and phase_start is not None:
-                    valid = not any(not (i - 1 < s or phase_start > e) for s, e in excluded_ranges)
-                    phases.append(GaitPhase(
-                        leg, current_phase,
-                        phase_start + start_offset,
-                        i - 1 + start_offset,
-                        i - phase_start,
-                        valid
-                    ))
-                # Start new phase
-                current_phase = new_phase
-                phase_start = i
+                    # Check if the phase starts and ends within the same valid range
+                    start_range = get_range_for_frame(phase_start)
+                    end_range = get_range_for_frame(i - 1)
+
+                    if start_range is not None and start_range == end_range:
+                        phases.append(GaitPhase(
+                            leg, current_phase,
+                            phase_start + start_offset,
+                            i - 1 + start_offset,
+                            i - phase_start,
+                            valid=True
+                        ))
+
+                # Start new phase only if the event is in a valid range
+                if event_range is not None:
+                    current_phase = new_phase
+                    phase_start = i
+                else:
+                    # If the event is not in a valid range, reset the current phase
+                    current_phase = PhaseType.UNKNOWN
+                    phase_start = None
 
         # Close last phase
         if current_phase != PhaseType.UNKNOWN and phase_start is not None:
-            valid = not any(not (total_frames - 1 < s or phase_start > e) for s, e in excluded_ranges)
-            phases.append(GaitPhase(
-                leg, current_phase,
-                phase_start + start_offset,
-                total_frames - 1 + start_offset,
-                total_frames - phase_start,
-                valid
-            ))
+            # Check if the phase starts and ends within the same valid range
+            start_range = get_range_for_frame(phase_start)
+            end_range = get_range_for_frame(total_frames - 1)
 
-        return [p for p in phases if p.valid]
+            if start_range is not None and start_range == end_range:
+                phases.append(GaitPhase(
+                    leg, current_phase,
+                    phase_start + start_offset,
+                    total_frames - 1 + start_offset,
+                    total_frames - phase_start,
+                    valid=True
+                ))
+
+        return phases
 
     l_phases = build_phases_for_leg(left_events, Leg.LEFT)
     r_phases = build_phases_for_leg(right_events, Leg.RIGHT)
