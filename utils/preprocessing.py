@@ -78,8 +78,8 @@ if __name__ == "__main__":
     # TODO: Functions
     # [x] split_videos
     # [x] filter_annotations
-    # [ ] get_keypoints (from input params)
-    # [ ] normalize_to_height
-    # [ ] get_relative_coords
+    # [x] get_keypoints (from input params)
+    # [ ] normalize_to_height - wont read the whole JSON, will be used on the go
+    # [ ] get_relative_coords - wont read the whole JSON, will be used on the go
 
     pass
