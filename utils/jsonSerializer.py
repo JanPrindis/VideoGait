@@ -84,26 +84,19 @@ class AnnotationSerializer:
 
     @staticmethod
     def load(input_file_path: str):
-        """Returns (left_events, right_events, fps)"""
         with open(input_file_path, 'r', encoding='utf-8') as f:
-            raw = json.load(f)
+            data = json.load(f)
 
-        if "annotations" in raw:
-            ann = raw["annotations"]
-            metadata = raw.get("metadata", {})
-        else:
-            ann = raw
-            metadata = {}
-
-        fps = metadata.get("fps", None)
-
-        left_events = [
-            GaitEvent(frame=e["frame"], event_type=GaitEventType(e["event_type"]))
-            for e in ann.get("left", [])
-        ]
-        right_events = [
-            GaitEvent(frame=e["frame"], event_type=GaitEventType(e["event_type"]))
-            for e in ann.get("right", [])
-        ]
-
-        return left_events, right_events, fps
+        # Parse the annotations into GaitEvent objects
+        if "annotations" in data:
+            for leg in ["left", "right"]:
+                if leg in data["annotations"]:
+                    event_list = [
+                        GaitEvent(
+                            frame=event_data["frame"],
+                            event_type=GaitEventType(event_data["event_type"])
+                        )
+                        for event_data in data["annotations"][leg]
+                    ]
+                    data["annotations"][leg] = event_list
+        return data
