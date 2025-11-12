@@ -1,68 +1,85 @@
 import numpy as np
-from scipy.signal import butter, filtfilt, find_peaks
-from scipy.interpolate import CubicSpline
+
+from Skeletons.halpe_skeleton import HALPE_SKELETON
+from utils.data import get_valid_range, get_keypoints
+from utils.jsonSerializer import KeypointSerializer, AnnotationSerializer
 
 
-def cubic_interpolate_nan(y):
-    y = np.array([np.nan if v is None else v for v in y], dtype=float)
-    mask = ~np.isnan(y)
-    if np.sum(mask) < 2:
-        return y # Not enough points to interpolate
+def split_video(keypoint_json_path, skeleton_definition, frame_rate=60, exclude_ratio=0.1):
+    keypoints, valid_indices = get_keypoints(
+        keypoint_json_path,
+        skeleton_definition,
+        ["HIP"])
 
-    first_valid = np.argmax(mask)
-    last_valid = len(y) - np.argmax(mask[::-1]) - 1
+    hip = np.array([coord[0] for coord in keypoints["HIP"]])
+    trimmed_valid_range = get_valid_range(hip, frame_rate, exclude_ratio)
+    global_valid_range = [(start + valid_indices[0], end + valid_indices[0]) for start, end in trimmed_valid_range]
 
-    x = np.arange(len(y))
-    x_seg = x[first_valid:last_valid + 1]
-    y_seg = y[first_valid:last_valid + 1]
+    json = KeypointSerializer.load(keypoint_json_path)
+    split_keypoint_data = []
+    for (start, end) in global_valid_range:
+        clip = json[start:end + 1]
+        split_keypoint_data.append(clip)
 
-    mask_seg = ~np.isnan(y_seg)
-    cs = CubicSpline(x_seg[mask_seg], y_seg[mask_seg])
-    y_interp = cs(x_seg)
-
-    return np.array(y_interp)
-
-
-def butterworth_filter(data, cutoff=5, fs=60.0, order=5):
-    normal_cutoff = cutoff / (fs / 2)
-    b, a = butter(order, normal_cutoff, btype='low')
-    y = filtfilt(b, a, data)
-    return np.array(y)
+    return split_keypoint_data
 
 
-def find_minima_maxima(data, distance=20, prominence=None, rel_prominence=0.3):
-    """
-    Detect local minima and maxima in a 1D signal.
+def get_valid_annotations(annotations_json_path, video_keypoints):
+    if len(video_keypoints) < 2:
+        return
 
-    Parameters
-    ----------
-    data : np.ndarray
-        1D array representing the input signal.
-    distance : int, optional
-        Minimum number of samples between consecutive peaks (default: 20).
-        Helps to avoid detecting multiple peaks too close to each other.
-    prominence : float or None, optional
-        Minimum prominence of peaks to be considered valid. If None, it is computed
-        automatically as percentage (`rel_prominence`) of the total peak-to-peak amplitude of the signal.
-    rel_prominence : float, optional (default: 0.3)
+    # Get frame numbers from image_id attribute ("FRAME_NUMBER.jpg")
+    valid_range = range(
+        int(video_keypoints[0]["image_id"].split(".")[0]),
+        int(video_keypoints[-1]["image_id"].split(".")[0]))
 
-    Returns
-    -------
-    Tuple[np.ndarray, np.ndarray]
-        Two arrays of the same length as `data`:
-        - First array contains detected **minima** values at their positions, and `None` elsewhere.
-        - Second array contains detected **maxima** values at their positions, and `None` elsewhere.
-    """
+    annotations_data = AnnotationSerializer.load(annotations_json_path)
 
-    if prominence is None:
-        prominence = np.ptp(data) * rel_prominence
+    for side in ["left", "right"]:
+        # Iterate backwards to safely delete elements
+        for i in range(len(annotations_data["annotations"][side]) - 1, -1, -1):
+            if annotations_data["annotations"][side][i].frame not in valid_range:
+                del annotations_data["annotations"][side][i]
 
-    minima, _ = find_peaks(-data, distance=distance, prominence=prominence)
-    maxima, _ = find_peaks(data, distance=distance, prominence=prominence)
-    minima_out = [None] * len(data)
-    maxima_out = [None] * len(data)
-    for p in minima:
-        minima_out[p] = data[p]
-    for p in maxima:
-        maxima_out[p] = data[p]
-    return np.array(minima_out), np.array(maxima_out)
+    return annotations_data
+
+
+if __name__ == "__main__":
+    data = split_video(
+        keypoint_json_path="../results/test.json",
+        skeleton_definition=HALPE_SKELETON,
+        frame_rate=60,
+        exclude_ratio=0.1
+    )
+
+    annotations = get_valid_annotations("../annotations/NM/001_.json", data[0])
+    left_events = annotations["annotations"]["left"]
+    right_events = annotations["annotations"]["right"]
+
+    # TODO: Training pre-processing
+    # 1. Split video into clips
+    # 2. Filter out annotations for each clip
+    # 3. Get required keypoints
+    # 4. Normalize keypoints to height
+    # 5. Calculate relative keypoint coords to hip, mirror if needed
+    # 6. Calculate other input params
+
+    # TODO: ML infer pre-processing
+    # 1. Split video into clips
+    # 2. Get required keypoints
+    # 3. Normalize keypoints to height
+    # 4. Calculate relative keypoint coords to hip, mirror if needed
+    # 5. Calculate other input params
+
+    # TODO: Basic pre-processing
+    # 1. Split into clips
+    # 2. Get required keypoints
+
+    # TODO: Functions
+    # [x] split_videos
+    # [x] filter_annotations
+    # [ ] get_keypoints (from input params)
+    # [ ] normalize_to_height
+    # [ ] get_relative_coords
+
+    pass
