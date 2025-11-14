@@ -81,7 +81,6 @@ def RIFE_interpolate(
 
     # If output isn't provided, derive from input
     if output is None:
-        import os
         base, _ = os.path.splitext(video)
         output = f"{base}_RIFE.{ext}"
 
@@ -141,16 +140,7 @@ def RIFE_interpolate(
     for frame_np in videogen:
         frame = torch.from_numpy(np.transpose(frame_np, (2,0,1))).to(device).unsqueeze(0).float() / 255.
         frame = _pad_image(frame, padding, fp16)
-
-        # Skip almost identical frames
-        I0_small = F.interpolate(last_frame, (32,32), mode='bilinear', align_corners=False)
-        I1_small = F.interpolate(frame, (32,32), mode='bilinear', align_corners=False)
-        ssim = ssim_matlab(I0_small[:, :3], I1_small[:, :3])
-
-        if ssim > 0.996:
-            interp_frames = []
-        else:
-            interp_frames = _make_inference(model, last_frame, frame, n=(2 ** exp - 1), scale=scale)
+        interp_frames = _make_inference(model, last_frame, frame, n=(2 ** exp - 1), scale=scale)
 
         # Write frame
         out_frame = (last_frame[0] * 255).byte().cpu().numpy().transpose(1,2,0)[:height, :width]
