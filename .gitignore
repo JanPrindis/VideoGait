@@ -5,6 +5,6 @@ videos/*
 results/*
 models/*
 
-dataset/*.mov
-dataset/*.mp4
-dataset/*.json
+dataset/**/*.mov
+dataset/**/*.mp4
+dataset/**/*.json
