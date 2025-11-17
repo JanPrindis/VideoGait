@@ -151,7 +151,12 @@ def interpolate_video_fps(orig_video_path, out_video_path, target_fps):
     encoder = "h264_nvenc" if is_nvenc_available() else "libx264"
 
     def run_ffmpeg_with_progress(command, total_frames):
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, encoding='utf-8')
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            encoding='utf-8')
 
         pbar = tqdm(total=total_frames, desc="minterpolate", unit="frame", leave=False)
 
@@ -219,14 +224,13 @@ def interpolate_video_fps(orig_video_path, out_video_path, target_fps):
         os.remove(temp_video_path)
 
 
-def interpolate_all_videos(dataset_root_path):
+def interpolate_all_videos(dataset_root_path, interpolate_to: list[int]):
     merged_dir = os.path.join(dataset_root_path, "MERGED")
     interpolated_root = os.path.join(dataset_root_path, "INTERPOLATED")
 
     all_videos = glob(f"{merged_dir}/*.mp4", recursive=True)
 
-    for target_fps in [60, 120]:
-    # for target_fps in [120]:
+    for target_fps in interpolate_to:
         interpolated_dir = os.path.join(interpolated_root, str(target_fps))
         os.makedirs(interpolated_dir, exist_ok=True)
 
@@ -242,7 +246,7 @@ def interpolate_all_videos(dataset_root_path):
                 print(f"Skipping {video_path}: {e}")
 
 
-def process_videos(dataset_root_path, detector, visualizer):
+def process_videos(dataset_root_path, detector, visualizer=None):
     processed_root = os.path.join(dataset_root_path, "PROCESSED")
 
     modes_to_process = [
@@ -283,14 +287,15 @@ def process_videos(dataset_root_path, detector, visualizer):
                 continue
 
             try:
-                visualizer.visualize(
-                    original_video=video_path,
-                    visualizer_output_path=annotated_dir,
-                    visualizer_output_file=annotated_name,
-                    detector_output_path=keypoint_dir,
-                    detector_output_file=json_name,
-                    confidence_threshold=0.6
-                )
+                if visualizer is not None:
+                    visualizer.visualize(
+                        original_video=video_path,
+                        visualizer_output_path=annotated_dir,
+                        visualizer_output_file=annotated_name,
+                        detector_output_path=keypoint_dir,
+                        detector_output_file=json_name,
+                        confidence_threshold=0.6
+                    )
             except Exception as e:
                 print(f"[ERROR] Visualization failed for {video_path}: {e}")
 
@@ -325,6 +330,8 @@ def recalculate_annotations(annotations_root_path):
             serializer.save()
             pbar.update(1)
 
+    pbar.close()
+
 
 if __name__ == "__main__":
     annotations_root_path = "./annotations"
@@ -350,12 +357,17 @@ if __name__ == "__main__":
     merge_videos(dataset_root_path, blacklist)
 
     # Interpolate
-    interpolate_all_videos(dataset_root_path)
+    # This process can be slow. To optimize, first interpolate videos to 60fps.
+    # Then, replace the original videos with these 60fps versions before interpolating to 120fps.
+    # This strategy leverages RIFE for the second interpolation, which is significantly faster with a CUDA-enabled GPU,
+    # as it avoids repeated use of FFmpeg's minterpolate.
+    interpolate_all_videos(dataset_root_path, interpolate_to=[60, 120])
 
     # Process and visualize
-    rtmlib = RTMLib()
-    vis = Visualizer(skeleton_definition=HALPE_SKELETON)
+    rtmlib = RTMLib()                                       # Can be any keypoint detector
+    vis = Visualizer(skeleton_definition=HALPE_SKELETON)    # Skeleton is based on the detector's output
 
+    # To skip visualization, pass None as visualizer in the parameter
     process_videos(
         dataset_root_path,
         detector=rtmlib,
@@ -363,4 +375,6 @@ if __name__ == "__main__":
     )
 
     # Update annotations
-    #recalculate_annotations(annotations_root_path)
+    # This is not required, as the annotations are already pre-calculated.
+    # Only use if the 60/120 folders are missing in the annotations folder.
+    # recalculate_annotations(annotations_root_path)
