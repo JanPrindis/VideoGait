@@ -1,0 +1,115 @@
+{
+    "metadata": {
+        "fps": 60
+    },
+    "annotations": {
+        "left": [
+            {
+                "frame": 106,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 130,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 172,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 196,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 236,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 260,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 300,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 354,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 396,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 420,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 456,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 480,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 520,
+                "event_type": "toe_off"
+            }
+        ],
+        "right": [
+            {
+                "frame": 96,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 140,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 164,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 204,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 228,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 268,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 292,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 364,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 388,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 426,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 450,
+                "event_type": "heel_strike"
+            },
+            {
+                "frame": 488,
+                "event_type": "toe_off"
+            },
+            {
+                "frame": 512,
+                "event_type": "heel_strike"
+            }
+        ]
+    }
+}

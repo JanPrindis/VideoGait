@@ -8,6 +8,7 @@ import subprocess
 from Skeletons.halpe_skeleton import HALPE_SKELETON
 from rtmlib.infer import RTMLib
 from interpolate import RIFE_interpolate
+from utils.jsonSerializer import AnnotationSerializer
 from utils.visualizer import Visualizer
 
 _is_nvenc_available = None
@@ -296,8 +297,38 @@ def process_videos(dataset_root_path, detector, visualizer):
         pbar.close()
 
 
+def recalculate_annotations(annotations_root_path):
+    all_files = glob(annotations_root_path + "/ORIGINAL/*.json")
+
+    for out_framerate in [60, 120]:
+        out_path = os.path.join(annotations_root_path, f"{out_framerate}")
+        os.makedirs(out_path, exist_ok=True)
+
+        pbar = tqdm(all_files, desc = f"Recalculating annotations to {out_framerate}fps", unit = "video", leave=False)
+        for file in all_files:
+            base_name = os.path.basename(file)
+
+            data = AnnotationSerializer.load(file)
+            original_fps = int(data["metadata"]["fps"])
+            ratio = out_framerate / original_fps
+            serializer = AnnotationSerializer(
+                output_path=out_path,
+                output_file_name=base_name,
+                fps=out_framerate
+            )
+
+            for side in ["left", "right"]:
+                for event in data["annotations"][side]:
+                    event.frame = round(event.frame * ratio)
+                    serializer.add_event(side, event)
+
+            serializer.save()
+            pbar.update(1)
+
+
 if __name__ == "__main__":
-    dataset_root_path = ""
+    annotations_root_path = "./annotations"
+    dataset_root_path = "./dataset"
     blacklist = [
         "002_NM_01.MOV", # Bad crop
         "004_NM_01.MOV", # Bad crop
@@ -315,9 +346,13 @@ if __name__ == "__main__":
     # Preload DLLs from NVIDIA site packages
     onnxruntime.preload_dlls(directory="")
 
+    # Merge
     merge_videos(dataset_root_path, blacklist)
+
+    # Interpolate
     interpolate_all_videos(dataset_root_path)
 
+    # Process and visualize
     rtmlib = RTMLib()
     vis = Visualizer(skeleton_definition=HALPE_SKELETON)
 
@@ -326,3 +361,6 @@ if __name__ == "__main__":
         detector=rtmlib,
         visualizer=vis
     )
+
+    # Update annotations
+    #recalculate_annotations(annotations_root_path)
