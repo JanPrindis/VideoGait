@@ -152,5 +152,52 @@ def get_keypoints(keypoint_json_path, skeleton_definition, items_to_get, confide
                 # if skeleton_definition does not contain the requested keypoint, it will be (None, None, None)
                 pass
 
+    trimmed_keypoints = {}
+    for item in items_to_get:
+        trimmed_keypoints[item] = trim(extracted_keypoints[item], valid_indices[0], valid_indices[-1])
 
-    return extracted_keypoints, valid_indices
+    return trimmed_keypoints, valid_indices
+
+def average_with_nones(list1, list2):
+    """
+    Averages two lists element-wise, handling None values.
+
+    This function can handle lists of numbers or lists of tuples (keypoints).
+    - If both elements are valid, their average is taken.
+    - If one element is valid and the other is None, the valid element is taken.
+    - If both are None, None is returned.
+    """
+    if len(list1) != len(list2):
+        raise ValueError("Input lists must have the same length!")
+
+    result = []
+    for item1, item2 in zip(list1, list2):
+        # Check if the item is a keypoint tuple (x, y, conf) or a simple number
+        is_item1_valid = item1 is not None and (not isinstance(item1, tuple) or item1[0] is not None)
+        is_item2_valid = item2 is not None and (not isinstance(item2, tuple) or item2[0] is not None)
+
+        if is_item1_valid and is_item2_valid:
+            if isinstance(item1, tuple):
+                result.append(tuple((v1 + v2) / 2 for v1, v2 in zip(item1, item2)))
+            else:
+                result.append((item1 + item2) / 2)
+        elif is_item1_valid:
+            result.append(item1)
+        elif is_item2_valid:
+            result.append(item2)
+        else:
+            result.append(None)
+    return result
+
+
+def calculate_torso_height(hip_coords, neck_coords):
+    """
+    Calculates the vertical distance between hip and neck for each frame.
+    """
+    heights = []
+    for hip, neck in zip(hip_coords, neck_coords):
+        if hip is not None and neck is not None and hip[1] is not None and neck[1] is not None:
+            heights.append(abs(hip[1] - neck[1]))
+        else:
+            heights.append(None)
+    return heights
