@@ -29,28 +29,28 @@ right_toe = np.array([coord[0] for coord in extracted_keypoints["RIGHT_FOOT_INDE
 left_heel = np.array([coord[0] for coord in extracted_keypoints["LEFT_HEEL"]])
 right_heel = np.array([coord[0] for coord in extracted_keypoints["RIGHT_HEEL"]])
 
-total_frames = len(hip)
+total_frames = len(hip) + valid_indices[0]
 
 # Trim
-trimmed_range = range(valid_indices[0], valid_indices[-1] + 1)
-trimmed_range_len = trimmed_range.stop - trimmed_range.start
+# trimmed_range = range(valid_indices[0], valid_indices[-1] + 1)
+# trimmed_range_len = trimmed_range.stop - trimmed_range.start
 
 print(f"first_valid {valid_indices[0]}")
 
-hip = trim(hip, valid_indices[0], valid_indices[-1])
-left_toe = trim(left_toe, valid_indices[0], valid_indices[-1])
-right_toe = trim(right_toe, valid_indices[0], valid_indices[-1])
-left_heel = trim(left_heel, valid_indices[0], valid_indices[-1])
-right_heel = trim(right_heel, valid_indices[0], valid_indices[-1])
+# hip = trim(hip, valid_indices[0], valid_indices[-1])
+# left_toe = trim(left_toe, valid_indices[0], valid_indices[-1])
+# right_toe = trim(right_toe, valid_indices[0], valid_indices[-1])
+# left_heel = trim(left_heel, valid_indices[0], valid_indices[-1])
+# right_heel = trim(right_heel, valid_indices[0], valid_indices[-1])
 
 valid_ranges = get_valid_range(hip, frame_rate, exclude_percent=0.05)
 
 # Detect gait events
 
 # Using Zeni et al. method
-# left_events, right_events = gait_detect_zeni(
-#     hip, left_toe, right_toe, left_heel, right_heel,
-#     frame_rate=frame_rate,)
+left_events, right_events = gait_detect_zeni(
+    hip, left_toe, right_toe, left_heel, right_heel,
+    frame_rate=frame_rate,)
 
 # Using Ghoussayni et al. method
 # left_events, right_events = gait_detect_ghoussayni(
@@ -59,10 +59,10 @@ valid_ranges = get_valid_range(hip, frame_rate, exclude_percent=0.05)
 #     debug=True)
 
 # Using Hsue et al. method
-left_events, right_events = gait_detect_hsue(
-    hip, left_toe, right_toe, left_heel, right_heel,
-    frame_rate=frame_rate,
-    debug=True)
+# left_events, right_events = gait_detect_hsue(
+#     hip, left_toe, right_toe, left_heel, right_heel,
+#     frame_rate=frame_rate,
+#     debug=True)
 
 # TODO: Bonci et al. method
 
