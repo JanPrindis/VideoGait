@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 from scipy.interpolate import CubicSpline
 from scipy.signal import find_peaks, butter, filtfilt
@@ -158,6 +160,7 @@ def get_keypoints(keypoint_json_path, skeleton_definition, items_to_get, confide
 
     return trimmed_keypoints, valid_indices
 
+
 def average_with_nones(list1, list2):
     """
     Averages two lists element-wise, handling None values.
@@ -192,12 +195,71 @@ def average_with_nones(list1, list2):
 
 def calculate_torso_height(hip_coords, neck_coords):
     """
-    Calculates the vertical distance between hip and neck for each frame.
+    Calculates the Euclidean distance between hip and neck for each frame to serve as a stable torso height.
     """
     heights = []
     for hip, neck in zip(hip_coords, neck_coords):
-        if hip is not None and neck is not None and hip[1] is not None and neck[1] is not None:
-            heights.append(abs(hip[1] - neck[1]))
+        # Ensure both hip and neck coordinates and their components are valid for the current frame
+        if hip and hip[0] is not None and hip[1] is not None and \
+                neck and neck[0] is not None and neck[1] is not None:
+
+            # Calculate the Euclidean distance
+            dist = np.sqrt((hip[0] - neck[0]) ** 2 + (hip[1] - neck[1]) ** 2)
+            heights.append(dist)
         else:
+            # If either keypoint is missing, the height for this frame is unknown
             heights.append(None)
     return heights
+
+
+def find_matching_annotation(keypoint_json_path: str, annotations_root: str) -> str | None:
+    """
+    Finds the corresponding annotation file path for a given keypoint file path
+    based on a specific directory structure.
+
+    Args:
+        keypoint_json_path (str): The full path to the keypoint JSON file.
+            Expected format: .../PROCESSED/{FPS}/KEYPOINTS/{file_name}.json
+        annotations_root (str): The root directory where annotations are stored.
+
+    Returns:
+        str | None: The full path to the corresponding annotation file,
+                    or None if the keypoint path format is incorrect.
+    """
+    try:
+        # Normalize path separators
+        norm_path = os.path.normpath(keypoint_json_path)
+        parts = norm_path.split(os.sep)
+
+        # Extract file_name
+        file_name = parts[-1]
+        # FPS, which is the third to last part
+        fps = parts[-3]
+
+        # Sanity check if path is as expected
+        if parts[-2].upper() != 'KEYPOINTS' or parts[-4].upper() != 'PROCESSED':
+             print(f"[Warning] Keypoint path '{keypoint_json_path}' does not seem to match the expected structure.")
+             return None
+
+        # Construct the new path using the extracted parts
+        annotation_path = os.path.join(annotations_root, fps, file_name)
+        return annotation_path
+
+    except IndexError:
+        print(f"[Warning] Could not parse keypoint path: '{keypoint_json_path}'.")
+        return None
+
+
+def calculate_angle(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> np.ndarray:
+    """Calculates the angle at point p2 in degrees for N frames."""
+    v1 = p1 - p2
+    v2 = p3 - p2
+    angle = np.degrees(np.arctan2(v2[:, 1], v2[:, 0]) - np.arctan2(v1[:, 1], v1[:, 0]))
+    angle = np.abs(angle)
+    angle[angle > 180] = 360.0 - angle[angle > 180]
+    return angle
+
+
+def calculate_distance(p1: np.ndarray, p2: np.ndarray) -> np.ndarray:
+    """Calculates the absolute horizontal distance (x-offset) between p1 and p2 for N frames."""
+    return np.abs(p1[:, 0] - p2[:, 0])
