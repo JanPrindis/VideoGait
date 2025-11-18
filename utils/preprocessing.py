@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -5,7 +7,7 @@ import matplotlib.pyplot as plt
 from Skeletons.halpe_skeleton import HALPE_SKELETON
 from gaitStructs import GaitEventType
 from utils.data import get_valid_range, get_keypoints, cubic_interpolate_nan, butterworth_filter, average_with_nones, \
-    calculate_torso_height
+    calculate_torso_height, calculate_distance, calculate_angle
 from utils.jsonSerializer import KeypointSerializer, AnnotationSerializer
 
 
@@ -72,7 +74,7 @@ def preprocess_keypoints(keypoints: dict, frame_rate: float):
         y_processed = butterworth_filter(y_processed, cutoff=5, order=4, fs=frame_rate)
 
         # Recombine into list of tuples, keeping original confidence
-        processed_keypoints[name] = list(zip(x_processed, y_processed, conf_scores))
+        processed_keypoints[name] = list(zip(x_processed.tolist(), y_processed.tolist(), conf_scores))
 
     return processed_keypoints
 
@@ -153,7 +155,7 @@ def visualize_normalized_skeleton(normalized_keypoints: dict, skeleton_definitio
 
         # Set plot limits and aspect ratio
         ax.set_xlim(-1.5, 1.5)
-        ax.set_ylim(1.5, -1.5)  # Invert Y-axis to match image coordinates
+        ax.set_ylim(1.8, -1.8)  # Invert Y-axis to match image coordinates
         ax.set_aspect('equal', adjustable='box')
         ax.grid(True)
         fig.canvas.draw()
@@ -219,33 +221,30 @@ def create_clips(normalized_keypoints: dict, original_keypoints: dict, valid_ran
 
 def create_processed_clips(
         keypoints_path: str,
-        annotations_path: str,
         skeleton_definition,
         required_keypoints: list,
         confidence_threshold: float = 0.5,
         exclude_ratio: float = 0.1,
+        annotations_path: str | None = None,  # Now fully optional
+        frame_rate: float | None = None,      # Optional, but required if annotations are missing
         create_labels: bool = True
 ):
-    """
-    A full pipeline to load, process, normalize, and split keypoints into standardized clips.
+    has_annotations = annotations_path and os.path.exists(annotations_path)
 
-    This function serves as a base for both ML training (with labels) and other
-    processing tasks (without labels).
+    if has_annotations:
+        # If annotations exist, they are the source of truth for FPS.
+        determined_frame_rate = AnnotationSerializer.load(annotations_path)["metadata"]["fps"]
+    elif frame_rate is not None:
+        # If no annotations, use the manually provided frame rate.
+        determined_frame_rate = frame_rate
+    else:
+        # If neither is available, we cannot proceed.
+        raise ValueError("`frame_rate` must be provided when `annotations_path` is not specified.")
 
-    Args:
-        keypoints_path (str): Path to the keypoints JSON file.
-        annotations_path (str): Path to the annotations JSON file.
-        skeleton_definition: The skeleton definition object.
-        required_keypoints (list): A list of keypoint names to load.
-        confidence_threshold (float): Minimum confidence to consider a keypoint valid.
-        exclude_ratio (float): The percentage of the walking path to exclude from the start/end.
-        create_labels (bool): If True, generates one-hot encoded labels for each clip.
+    # Disable label creation if we don't have annotations to create them from.
+    if not has_annotations:
+        create_labels = False
 
-    Returns:
-        tuple: A tuple containing:
-            - list: A list of processed clips. Each clip is a dictionary of keypoint lists.
-            - list or None: A list of corresponding labels for each clip if create_labels is True, otherwise None.
-    """
     # 1. Load and prepare keypoints
     # Essential keypoints needed for core processing (normalization, direction detection)
     essential_keypoints = {"HIP", "LEFT_HIP", "RIGHT_HIP", "NECK", "LEFT_SHOULDER", "RIGHT_SHOULDER"}
@@ -260,8 +259,9 @@ def create_processed_clips(
         confidence_threshold=confidence_threshold
     )
 
-    # Copy the original keypoints for direction detection later
-    original_keypoints_for_direction = {name: list(coords) for name, coords in keypoints.items()}
+    if not valid_indices:
+        print(f"No valid frames found in {keypoints_path} with confidence > {confidence_threshold}. Skipping.")
+        return [], [], [], determined_frame_rate
 
     # If the "HIP" keypoint data is all None, calculate it by averaging
     if all(coord[0] is None for coord in keypoints["HIP"]):
@@ -275,15 +275,18 @@ def create_processed_clips(
         rs = keypoints["RIGHT_SHOULDER"]
         keypoints["NECK"] = average_with_nones(ls, rs)
 
+    # Copy the original keypoints for direction detection later
+    original_keypoints_for_direction = {name: list(coords) for name, coords in keypoints.items()}
+    original_keypoints_for_direction = preprocess_keypoints(original_keypoints_for_direction, determined_frame_rate)
+
     # 2. Smooth and normalize the keypoints
-    frame_rate = AnnotationSerializer.load(annotations_path)["metadata"]["fps"]
-    keypoints = preprocess_keypoints(keypoints, frame_rate)
+    keypoints = preprocess_keypoints(keypoints, determined_frame_rate)
     normalized_keypoints = normalize_coords(keypoints)
 
     # 3. Identify and split into clips
     trimmed_valid_range = get_valid_range(
         np.array([coord[0] for coord in keypoints["HIP"]]),
-        frame_rate,
+        determined_frame_rate,
         exclude_ratio
     )
     clips = create_clips(
@@ -292,19 +295,31 @@ def create_processed_clips(
         valid_ranges=trimmed_valid_range
     )
 
+    # Calculate global ranges that correspond to the original video's frame indices
+    global_valid_range = [(start + valid_indices[0], end + valid_indices[0]) for start, end in trimmed_valid_range]
+
+    # 4. Optionally create labels
     # 4. Optionally create labels
     all_labels = None
     if create_labels:
         all_labels = []
-        global_valid_range = [(start + valid_indices[0], end + valid_indices[0]) for start, end in trimmed_valid_range]
+        # We need to filter the ranges list just like we filter the clips list
+        final_clips = []
+        final_global_ranges = []
 
-        for start, end in global_valid_range:
-            segment_size = end - start + 1
-            labels = [[0, 0, 0, 0] for _ in range(segment_size)]
+        for idx, (start, end) in enumerate(global_valid_range):
             annotations = get_valid_annotations(
                 annotations_json_path=annotations_path,
                 valid_range=range(start, end + 1)
             )
+
+            # If a clip has no events, it's a bad segment. Skip it.
+            if len(annotations["annotations"]["left"]) == 0 and len(annotations["annotations"]["right"]) == 0:
+                continue
+
+            # This clip is valid, so we build its labels and keep it
+            segment_size = end - start + 1
+            labels = [[0, 0, 0, 0] for _ in range(segment_size)]
             for side in ["left", "right"]:
                 for annotation in annotations["annotations"][side]:
                     state = [0, 0, 0, 0]
@@ -312,20 +327,208 @@ def create_processed_clips(
                         state = [1, 0, 0, 0] if side == "left" else [0, 0, 1, 0]
                     elif annotation.event_type == GaitEventType.TOE_OFF:
                         state = [0, 1, 0, 0] if side == "left" else [0, 0, 0, 1]
-                    labels[annotation.frame - start] = state
-            all_labels.append(labels)
 
-    return clips, all_labels
+                    frame_idx_in_clip = annotation.frame - start
+                    if 0 <= frame_idx_in_clip < len(labels):
+                        labels[frame_idx_in_clip] = state
+
+            all_labels.append(labels)
+            final_clips.append(clips[idx])
+            final_global_ranges.append(global_valid_range[idx])
+
+        clips = final_clips
+        global_valid_range = final_global_ranges
+
+    print(f"{os.path.basename(keypoints_path)} resulted in {len(clips)} clips!")
+    return clips, all_labels, global_valid_range, determined_frame_rate
+
+
+def generate_keypoint_features(clip_dict: dict, keypoint_names: list) -> dict:
+    """Extracts (x, y) coordinates for specified keypoints."""
+    features = {}
+    for name in keypoint_names:
+        coords = np.array(clip_dict[name], dtype=np.float32)
+        # Replace any NaNs that resulted from None values
+        coords[np.isnan(coords)] = 0.0
+
+        features[f"{name}_x"] = coords[:, 0]
+        features[f"{name}_y"] = coords[:, 1]
+    return features
+
+
+def generate_kinematic_features(clip_dict: dict, keypoint_names: list, frame_rate: float) -> dict:
+    """Generates velocities and accelerations for specified keypoints."""
+    features = {}
+    dt = 1.0 / frame_rate
+    for name in keypoint_names:
+        coords = np.array(clip_dict[name], dtype=np.float32)[:, :2]
+
+        # Replace any remaining NaNs with 0.0 before differentiation
+        coords[np.isnan(coords)] = 0.0
+
+        # Calculate velocity
+        velocity = np.gradient(coords, dt, axis=0)
+        features[f"{name}_vx"] = velocity[:, 0]
+        features[f"{name}_vy"] = velocity[:, 1]
+
+        # Calculate acceleration
+        acceleration = np.gradient(velocity, dt, axis=0)
+        features[f"{name}_ax"] = acceleration[:, 0]
+        features[f"{name}_ay"] = acceleration[:, 1]
+    return features
+
+
+def generate_angle_features(clip_dict: dict, angle_triplets: list[tuple[str, str, str]]) -> dict:
+    """Generates joint angles based on user-defined triplets."""
+    features = {}
+    kp_arrays = {name: np.array(coords, dtype=np.float32)[:, :2] for name, coords in clip_dict.items()}
+
+    for p1_name, p2_name, p3_name in angle_triplets:
+        feature_name = f"angle_{p1_name}-{p2_name}-{p3_name}"
+        features[feature_name] = calculate_angle(kp_arrays[p1_name], kp_arrays[p2_name], kp_arrays[p3_name])
+    return features
+
+
+def generate_distance_features(clip_dict: dict, distance_pairs: list[tuple[str, str]]) -> dict:
+    """Generates distances based on user-defined pairs."""
+    features = {}
+    kp_arrays = {name: np.array(coords)[:, :2] for name, coords in clip_dict.items()}
+
+    for p1_name, p2_name in distance_pairs:
+        feature_name = f"dist_{p1_name}-{p2_name}"
+        features[feature_name] = calculate_distance(kp_arrays[p1_name], kp_arrays[p2_name])
+    return features
+
+
+def build_feature_matrix(
+        clip_dict: dict,
+        frame_rate: float,
+        keypoints: list = None,
+        kinematics_keypoints: list = None,
+        angle_triplets: list = None,
+        distance_pairs: list = None
+) -> tuple[np.ndarray, list[str]]:
+    """
+    Constructs a feature matrix and corresponding labels matrix (optional).
+    """
+    all_features_dict = {}
+
+    # Generate each requested feature type
+    if keypoints:
+        all_features_dict.update(generate_keypoint_features(clip_dict, keypoints))
+    if kinematics_keypoints:
+        all_features_dict.update(generate_kinematic_features(clip_dict, kinematics_keypoints, frame_rate))
+    if angle_triplets:
+        all_features_dict.update(generate_angle_features(clip_dict, angle_triplets))
+    if distance_pairs:
+        all_features_dict.update(generate_distance_features(clip_dict, distance_pairs))
+
+    # Get the final ordered list of feature names
+    feature_names = sorted(all_features_dict.keys())
+    if not feature_names:
+        return np.array([]), []
+
+    # Get the number of frames from the first available feature
+    num_frames = len(next(iter(all_features_dict.values())))
+    num_features = len(feature_names)
+
+    # Assemble the final matrix
+    feature_matrix = np.zeros((num_frames, num_features), dtype=np.float32)
+    for i, name in enumerate(feature_names):
+        feature_matrix[:, i] = all_features_dict[name]
+
+    # Final cleanup of any NaNs that may have been generated
+    feature_matrix[np.isnan(feature_matrix)] = 0.0
+
+    return feature_matrix, feature_names
+
+
+def generate_features(
+        keypoints_path: str,
+        skeleton_definition,
+        confidence_threshold: float,
+        exclude_ratio: float,
+        annotations_path: str | None = None,
+        frame_rate: float | None = None,
+        keypoints: list | None = None,
+        kinematics_keypoints: list | None = None,
+        angle_triplets: list | None = None,
+        distance_pairs: list | None = None
+) -> tuple[list[np.ndarray], list[np.ndarray], list[tuple[int, int]]]:
+    """
+     A unified preprocessor that generates feature matrices based on a list of desired feature types.
+     """
+    clips_raw, all_labels_raw, global_ranges, determined_frame_rate = create_processed_clips(
+        keypoints_path=keypoints_path,
+        annotations_path=annotations_path,
+        frame_rate=frame_rate, # Pass it down
+        skeleton_definition=skeleton_definition,
+        required_keypoints=keypoints,
+        confidence_threshold=confidence_threshold,
+        exclude_ratio=exclude_ratio,
+        create_labels=bool(annotations_path) # Only create labels if path is given
+    )
+
+    if not clips_raw:
+        return [], [], []
+
+    all_feature_matrices = []
+    all_label_matrices = []
+
+    # Build the arguments for the matrix builder based on feature_types
+    builder_kwargs = {}
+    if keypoints:
+        builder_kwargs["keypoints"] = keypoints
+    if kinematics_keypoints:
+        builder_kwargs["kinematics_keypoints"] = kinematics_keypoints
+    if angle_triplets:
+        builder_kwargs["angle_triplets"] = angle_triplets
+    if distance_pairs:
+        builder_kwargs["distance_pairs"] = distance_pairs
+
+    for i, clip_dict_raw in enumerate(clips_raw):
+        feature_matrix, _ = build_feature_matrix(
+            clip_dict=clip_dict_raw,
+            frame_rate=determined_frame_rate,
+            **builder_kwargs
+        )
+
+        if feature_matrix.size == 0:
+            continue
+
+        all_feature_matrices.append(feature_matrix)
+        # Only append labels if they were generated
+        if all_labels_raw:
+            all_label_matrices.append(np.array(all_labels_raw[i], dtype=np.float32))
+
+    return all_feature_matrices, all_label_matrices, global_ranges
 
 
 if __name__ == "__main__":
     exclude_ratio = 0.1
-    keypoints_path = "../dataset/PROCESSED/60/KEYPOINTS/NM_001.json"
-    annotations_path = "../annotations/60/NM_001.json"
+    keypoints_path = "../dataset/PROCESSED/60/KEYPOINTS/KOA_001_EL.json"
+    annotations_path = "../annotations/60/KOA_001_EL.json"
     skeleton_definition = HALPE_SKELETON
     required_keypoints = ["HIP", "LEFT_HIP", "RIGHT_HIP", "LEFT_KNEE", "RIGHT_KNEE", "LEFT_ANKLE", "RIGHT_ANKLE", "LEFT_HEEL", "RIGHT_HEEL", "LEFT_FOOT_INDEX", "RIGHT_FOOT_INDEX", "LEFT_SHOULDER", "RIGHT_SHOULDER", "NECK"]
+    required_kinematics = ["HIP", "LEFT_HIP", "RIGHT_HIP", "LEFT_KNEE", "RIGHT_KNEE", "LEFT_ANKLE", "RIGHT_ANKLE", "LEFT_HEEL", "RIGHT_HEEL", "LEFT_FOOT_INDEX", "RIGHT_FOOT_INDEX", "LEFT_SHOULDER", "RIGHT_SHOULDER", "NECK"]
+    required_angles = [("LEFT_HIP", "LEFT_KNEE", "LEFT_ANKLE"), ("RIGHT_HIP", "RIGHT_KNEE", "RIGHT_ANKLE")]
+    required_distances = [("HIP", "LEFT_FOOT_INDEX"), ("HIP", "RIGHT_FOOT_INDEX")]
 
-    clips, labels = create_processed_clips(
+    features, labels, ranges = generate_features(
+        keypoints_path=keypoints_path,
+        skeleton_definition=skeleton_definition,
+        confidence_threshold=0.5,
+        exclude_ratio=exclude_ratio,
+        annotations_path=annotations_path,
+        frame_rate=None,
+        keypoints=required_keypoints,
+        kinematics_keypoints=required_kinematics,
+        angle_triplets=required_angles,
+        distance_pairs=required_distances,
+    )
+
+
+    clips, labels, _ = create_processed_clips(
         keypoints_path=keypoints_path,
         annotations_path=annotations_path,
         skeleton_definition=skeleton_definition,
@@ -336,8 +539,9 @@ if __name__ == "__main__":
 
     # Visualization
     if clips:
-        print(f"Created {len(clips)} standardized clip(s). Visualizing the first one.")
-        visualize_normalized_skeleton(clips[0], skeleton_definition)
+        print(f"Created {len(clips)} standardized clip(s)")
+        for clip in clips:
+            visualize_normalized_skeleton(clip, skeleton_definition)
 
     # TODO: Training pre-processing
     # 1. Split video into clips
