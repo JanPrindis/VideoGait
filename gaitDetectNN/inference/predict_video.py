@@ -9,6 +9,11 @@ from gaitDetectNN.inference.predictor import Predictor
 from utils.preprocessing import generate_features
 from Skeletons.halpe_skeleton import HALPE_SKELETON
 
+# TODO: Load model and parameters from config file
+# TODO: Separate validation and inference pipelines? - One accepting ground truth, other not
+# TODO: This will be internal functions - will return gait-event structures
+# TODO: Validation pipeline - measure accuracy of detection compared to ground truth - separate file?
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -40,7 +45,8 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..
 TEST_VIDEO_KP_PATH = os.path.join(PROJECT_ROOT, "results/test.json")
 
 # TEST_VIDEO_ANN_PATH = os.path.join(PROJECT_ROOT, "annotations/60/PD_006_MD.json")
-TEST_VIDEO_ANN_PATH = None
+TEST_VIDEO_ANN_PATH = os.path.join(PROJECT_ROOT, "results/result.json")
+# TEST_VIDEO_ANN_PATH = None
 
 # =============================================================================
 # Prepare Data
@@ -126,6 +132,7 @@ for idx, test_clip_features in enumerate(feature_matrices):
     if all_labels is not None:
         all_labels[start_frame: end_frame + 1] = label_matrices[idx]
 
+# TODO: Maybe keep as a debug visualization (like verbose param or something)
 # Now, plot the combined results
 print("\nPlotting combined results for the entire video...")
 fig, axs = plt.subplots(4, 1, figsize=(18, 10), sharex=True)

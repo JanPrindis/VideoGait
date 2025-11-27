@@ -23,6 +23,17 @@ BATCH_SIZE = 32
 NUM_EPOCHS = 200
 RANDOM_SEED = 3
 
+# TODO: For training and inference, create config files containing the definition of the required features and model itself + checkpoint
+# TODO: Skeleton definition - which one to use (HALPE/GOOGLE)
+# TODO: Framerate of training videos - has to match during inference
+# TODO: Other parameters - exclusion range, min confidence level
+# TODO: Which collate function to use - maybe parameter passed during call
+# TODO: Check if the sliding window even works
+# TODO: Training split percentage, random seed - how to handle
+# TODO: Do something with the training history - save/plots
+# TODO: Single template training config file -> separate training files for each model? (or generic and somehow pass model as param)
+# TODO: Maybe one large config file containing all shared setup + specifics for inference and training
+
 # Data and Model Configuration
 SKELETON_DEFINITION = HALPE_SKELETON
 
