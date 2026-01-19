@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from Skeletons.halpe_skeleton import HALPE_SKELETON
+from skeletons.halpe_skeleton import HALPE_SKELETON
 from gaitStructs import GaitEventType
 from utils.data import get_valid_range, get_keypoints, cubic_interpolate_nan, butterworth_filter, average_with_nones, \
     calculate_torso_height, calculate_distance, calculate_angle

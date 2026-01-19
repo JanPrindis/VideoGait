@@ -1,5 +1,5 @@
 from enum import IntEnum
-from Skeletons.skeletons import SkeletonDefinition
+from skeletons.skeletons import SkeletonDefinition
 
 class HalpeKeypoints(IntEnum):
     NOSE = 0

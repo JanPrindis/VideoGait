@@ -5,7 +5,7 @@ import cv2
 from tqdm import tqdm
 import subprocess
 
-from Skeletons.halpe_skeleton import HALPE_SKELETON
+from skeletons.halpe_skeleton import HALPE_SKELETON
 from rtmlib.infer import RTMLib
 from interpolate import RIFE_interpolate
 from utils.jsonSerializer import AnnotationSerializer

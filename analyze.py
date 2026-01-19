@@ -7,7 +7,7 @@ from gaitDetectors.hsue import gait_detect_hsue
 from gaitDetectors.zeni import gait_detect_zeni
 from gaitStructs import build_phases_from_events
 from utils.jsonSerializer import KeypointSerializer
-from Skeletons.halpe_skeleton import HALPE_SKELETON
+from skeletons.halpe_skeleton import HALPE_SKELETON
 from utils.data import get_valid_range, trim, get_keypoints
 from visualizeGaitPhases import visualize_gait_phases, print_statistics
 
