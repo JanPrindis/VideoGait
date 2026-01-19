@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
+from gaitDetectNN.utils.registry import MODELS
 
+@MODELS.register
 class GaitLSTM(nn.Module):
     """
     An LSTM model for gait event detection, inspired by Zhang et al.

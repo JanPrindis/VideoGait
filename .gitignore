@@ -8,3 +8,5 @@ models/*
 dataset/**/*.mov
 dataset/**/*.mp4
 dataset/**/*.json
+
+experiments/*

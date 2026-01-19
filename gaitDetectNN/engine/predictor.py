@@ -29,24 +29,24 @@ class Predictor:
             np.ndarray: A numpy array of shape (seq_len, num_classes) containing
                         the predicted probabilities for each event.
         """
-        with torch.no_grad():  # Disable gradient calculations for speed
-            # 1. Convert numpy array to a torch tensor on the correct device
+        with torch.no_grad():
+            # Numpy -> Tensor
             features_tensor = torch.from_numpy(features_clip).float().to(self.device)
 
-            # 2. Add a "batch" dimension. The model expects a batch of clips.
+            # Add a "batch" dimension. The model expects a batch of clips.
             # Shape becomes: (1, seq_len, num_features)
             features_tensor = features_tensor.unsqueeze(0)
 
-            # 3. Create a lengths tensor for this single clip
+            # Create a lengths tensor for this single clip
             lengths_tensor = torch.tensor([features_clip.shape[0]], device='cpu')
 
-            # 4. Get the model's raw output (logits)
+            # Forward pass
             logits = self.model(features_tensor, lengths_tensor)
 
-            # 5. Convert logits to probabilities (0 to 1) using the sigmoid function
+            # Sigmoid (Logits -> Probabilities)
             probabilities = torch.sigmoid(logits)
 
-            # 6. Remove the batch dimension and move back to CPU for plotting/analysis
+            # Back to CPU
             predicted_probs = probabilities.squeeze(0).cpu().numpy()
 
             return predicted_probs
