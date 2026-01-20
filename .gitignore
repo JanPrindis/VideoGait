@@ -10,3 +10,4 @@ dataset/**/*.mp4
 dataset/**/*.json
 
 experiments/*
+benchmarkResults/*
