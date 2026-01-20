@@ -1,0 +1,31 @@
+experiment_name: "Benchmark_LSTM_Baseline_1"
+output_dir: "benchmarkResults/lstm_001"
+
+event_detector:
+  method: "NeuralNet" # "NeuralNet" or "Heuristic"
+
+  neural_net:
+    experiment_path: "experiments/LSTM_Baseline_Halpe"
+    checkpoint: "best_model.pth"
+
+    post_processing:
+      threshold: 0.6
+      min_distance_sec: 0.25
+
+  heuristic:
+    algorithm: "PLACEHOLDER"
+    skeleton: "HALPE"
+    framerate: 60
+    seed: 3
+    train_split: 0.8
+    # TODO: Params
+
+data:
+  dataset_root: "dataset/PROCESSED"
+  annotation_root: "annotations"
+
+  # If true, the whole dataset is used, if false, only the validation part of the seed is used.
+  use_full_dataset: False
+
+evaluation:
+  tolerance_ms: 150       # Match tolerance
