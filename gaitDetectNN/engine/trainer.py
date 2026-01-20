@@ -62,8 +62,8 @@ class Trainer:
         Computes F1 score.
         """
         with torch.no_grad():
-            probs = torch.sigmoid(logits)
-            preds = (probs > 0.5).float()
+            probabilities = torch.sigmoid(logits)
+            predictions = (probabilities > 0.5).float()
 
             b, t, c = logits.shape
             labels = labels[:, :t, :]
@@ -72,18 +72,18 @@ class Trainer:
             lengths = torch.clamp(lengths, max=t)
             mask = self._create_mask(lengths, t)
 
-            mask_expanded = mask.unsqueeze(-1).expand_as(preds)
+            mask_expanded = mask.unsqueeze(-1).expand_as(predictions)
 
-            active_preds = preds[mask_expanded]
+            active_predictions = predictions[mask_expanded]
             active_labels = labels[mask_expanded]
 
-            if active_preds.numel() == 0:
+            if active_predictions.numel() == 0:
                 return 0.0
 
             # TP, FP, FN calculation
-            tp = (active_preds * active_labels).sum().item()
-            fp = (active_preds * (1 - active_labels)).sum().item()
-            fn = ((1 - active_preds) * active_labels).sum().item()
+            tp = (active_predictions * active_labels).sum().item()
+            fp = (active_predictions * (1 - active_labels)).sum().item()
+            fn = ((1 - active_predictions) * active_labels).sum().item()
 
             # F1 Score formula
             epsilon = 1e-7
