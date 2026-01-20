@@ -369,7 +369,7 @@ def run_inference_pipeline(
 if __name__ == "__main__":
     config = "configs/apps/analyze_video.yaml"
     # input_path = "results/test.json"
-    input_path = "dataset/PROCESSED/60/KEYPOINTS/KOA_010_SV.json"
+    input_path = "dataset/PROCESSED/60/KEYPOINTS/PD_006_MD.json"
     output_dir = "results/test_patient"
 
     data = run_inference_pipeline(config, input_path, output_dir)
