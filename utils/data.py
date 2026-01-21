@@ -17,10 +17,25 @@ def trim(data, first_valid, last_valid):
     return data[first_valid:last_valid + 1]
 
 
-def get_valid_range(hip: np.array, frame_rate: float, exclude_percent: float = 0.1):
+def get_valid_range(
+        hip: np.array,
+        frame_rate: float,
+        exclude_percent: float = 0.1,
+        min_segment_length: int = 60,
+        outlier_ratio: float = 0.2
+):
+    # Safety check - length too short
+    if len(hip) < max(20, min_segment_length):
+        return []
+
     # Preprocessing
     hip = cubic_interpolate_nan(hip)
-    hip_f = butterworth_filter(hip, cutoff=5, order=4, fs=frame_rate)
+
+    # TODO: Pull parameters from config
+    try:
+        hip_f = butterworth_filter(hip, cutoff=5, order=4, fs=frame_rate)
+    except ValueError:
+        return []
 
     # Get X movement range of hip
     hip_min, hip_max = min(hip_f), max(hip_f)
@@ -59,6 +74,23 @@ def get_valid_range(hip: np.array, frame_rate: float, exclude_percent: float = 0
     # If the first excluded range starts at 0, remove the initial (0, -1) valid range
     if excluded_ranges and excluded_ranges[0][0] == 0 and valid_ranges and valid_ranges[0] == (0, -1):
         valid_ranges.pop(0)
+
+    # Filter out short segments
+    valid_ranges = [
+        (s, e) for s, e in valid_ranges
+        if (e - s + 1) >= min_segment_length
+    ]
+
+    # Filter out outliers
+    if len(valid_ranges) > 1:
+        lengths = [(e - s + 1) for s, e in valid_ranges]
+        max_len = max(lengths)
+        threshold = max_len * outlier_ratio
+
+        valid_ranges = [
+            r for r, l in zip(valid_ranges, lengths)
+            if l >= threshold
+        ]
 
     return valid_ranges
 
