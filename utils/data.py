@@ -63,25 +63,57 @@ def get_valid_range(hip: np.array, frame_rate: float, exclude_percent: float = 0
     return valid_ranges
 
 
-def cubic_interpolate_nan(y):
-    y = np.array([np.nan if v is None else v for v in y], dtype=float)
-    mask = ~np.isnan(y)
-    if np.sum(mask) < 2:
-        return y # Not enough points to interpolate
+def cubic_interpolate_nan(data):
+    y = np.array(data, dtype=float)
+    nans = np.isnan(y)
 
-    first_valid = np.argmax(mask)
-    last_valid = len(y) - np.argmax(mask[::-1]) - 1
+    # If there aren't any NaN values, return original
+    if not nans.any():
+        return y
+
+    non_nans_indices = np.where(~nans)[0]
+    n_valid = len(non_nans_indices)
+
+    # Edge case - no valid data
+    if n_valid == 0:
+        return np.zeros_like(y)
+
+    # Edge case - only one valid data point
+    if n_valid == 1:
+        # Cannot interpolate, fill with the same value
+        val = y[non_nans_indices[0]]
+        y[:] = val
+        return y
 
     x = np.arange(len(y))
-    x_seg = x[first_valid:last_valid + 1]
-    y_seg = y[first_valid:last_valid + 1]
 
-    mask_seg = ~np.isnan(y_seg)
-    cs = CubicSpline(x_seg[mask_seg], y_seg[mask_seg])
-    y_interp = cs(x_seg)
+    try:
+        # Interpolate on known data
+        cs = CubicSpline(x[~nans], y[~nans], extrapolate=False)
 
-    return np.array(y_interp)
+        y_interp = y.copy()
+        mask_interp = nans
+        y_interp[mask_interp] = cs(x[mask_interp])
 
+        # NaNs on edges are filled with the closest valid value
+        if np.isnan(y_interp).any():
+            # Forward Fill
+            mask = np.isnan(y_interp)
+            idx = np.where(~mask, np.arange(mask.shape[0]), 0)
+            np.maximum.accumulate(idx, axis=0, out=idx)
+            y_interp = y_interp[idx]
+
+            # Backward Fill
+            mask = np.isnan(y_interp)
+            idx = np.where(~mask, np.arange(mask.shape[0]), mask.shape[0] - 1)
+            idx = np.minimum.accumulate(idx[::-1], axis=0)[::-1]
+            y_interp = y_interp[idx]
+
+        return y_interp
+
+    except Exception as e:
+        print(f"[Warning] Interpolation failed: {e}")
+        return y
 
 def butterworth_filter(data, cutoff=5, fs=60.0, order=5):
     normal_cutoff = cutoff / (fs / 2)
