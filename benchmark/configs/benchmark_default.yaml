@@ -1,6 +1,17 @@
 experiment_name: "Benchmark_LSTM_Baseline_1"
 output_dir: "benchmarkResults/lstm_001"
 
+preprocessing:
+  framerate: 60
+  confidence_threshold: 0.4
+  exclude_ratio: 0.05
+
+  use_filter: true    # Use Butterworth filter for smoothing
+
+  # Butterworth filter params
+  filter_cutoff: 6
+  filter_order: 4
+
 event_detector:
   method: "NeuralNet" # "NeuralNet" or "Heuristic"
 

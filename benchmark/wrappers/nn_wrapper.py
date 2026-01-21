@@ -18,14 +18,8 @@ class NeuralNetWrapper:
     """
     Wraps the inference pipeline to provide a unified interface for the benchmark.
     """
-    def __init__(self, neural_net_cfg):
-        """
-        Initializes the wrapper with the neural network configuration.
-
-        Args:
-            neural_net_cfg (dict): Configuration dictionary for the neural network
-                                   (must contain 'experiment_path', 'checkpoint', etc.).
-        """
+    def __init__(self, preprocessing_cfg, neural_net_cfg):
+        self.preprocessing_cfg = preprocessing_cfg
         self.nn_cfg = neural_net_cfg
 
     def predict(self, input_path):
@@ -40,7 +34,7 @@ class NeuralNetWrapper:
         """
         # Create "Mock" app config file that required for inference
         mock_config = {
-            "preprocessing": {"framerate": 60}, # Dummy value, not used during inference
+            "preprocessing": self.preprocessing_cfg,
             "event_detector": {
                 "method": "NeuralNet",
                 "neural_net": self.nn_cfg
