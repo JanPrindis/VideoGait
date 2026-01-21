@@ -2,8 +2,6 @@ preprocessing:
   framerate: 60             # Default value, is used for Heuristic detection, if NN is used, it will match the framerate the model has been trained on. The input video will be interpolated to this value.
   confidence_threshold: 0.4 # Keypoints under this confidence are ignored
   exclude_ratio: 0.05       # % of patient movement to ignore on both edges (incomplete detection, or patient turning)
-  min_segment_length: 60
-  outlier_ratio: 0.2
 
   use_filter: true    # Use Butterworth filter for smoothing
 
@@ -44,7 +42,7 @@ event_detector:
     params:
       min_peak_distance: 20
       prominence: 10
-      motion_threshold: 0.5 # Pixels per frame
+      motion_threshold: 0.1 # Pixels per frame
 
 # Visualization (placeholder)
 visualization:
