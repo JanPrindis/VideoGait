@@ -68,9 +68,8 @@ def get_data_settings(cfg):
         heuristics_cfg = cfg['event_detector']['heuristic']
         print(f"[Data] Using explicit settings from Heuristic config.")
 
-        settings["framerate"] = heuristics_cfg['framerate']
+        settings["framerate"] = cfg['preprocessing']['framerate']
         settings["seed"] = heuristics_cfg['seed']
-        settings["split_ratio"] = heuristics_cfg['train_split']
         settings["split_ratio"] = heuristics_cfg['train_split']
 
     return settings

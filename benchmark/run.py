@@ -25,6 +25,7 @@ from gaitStructs import GaitEventType
 from benchmark.utils.data_manager import get_benchmark_files
 from benchmark.engine.matcher import match_events_greedy
 from benchmark.wrappers.nn_wrapper import NeuralNetWrapper
+from benchmark.wrappers.heuristic_wrapper import HeuristicWrapper
 
 
 # --- PLOTTING STYLE CONFIGURATION ---
@@ -65,10 +66,13 @@ def run_benchmark():
     # Setup Wrapper
     method = cfg['event_detector']['method']
     if method == "NeuralNet":
-        wrapper = NeuralNetWrapper(cfg['event_detector']['neural_net'])
+        wrapper = NeuralNetWrapper(cfg['preprocessing'], cfg['event_detector']['neural_net'])
+
+    elif method == "Heuristic":
+        wrapper = HeuristicWrapper(cfg['preprocessing'], cfg['event_detector']['heuristic'])
+
     else:
-        # TODO: Implement Heuristic Wrapper
-        raise NotImplementedError("Heuristics wrapper isn't implemented yet.")
+        raise ValueError(f"Unknown method: {method}")
 
     # Evaluation Loop Containers
     raw_matches = []

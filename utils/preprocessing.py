@@ -65,6 +65,7 @@ def preprocess_keypoints(keypoints: dict, frame_rate: float):
         y_coords = [c[1] if c is not None else None for c in coords_list]
         conf_scores = [c[2] if c is not None else None for c in coords_list]
 
+        # TODO: Make it so the filter parameters are pulled form config file
         # Interpolate and filter X coordinates
         x_processed = cubic_interpolate_nan(x_coords)
         x_processed = butterworth_filter(x_processed, cutoff=5, order=4, fs=frame_rate)
@@ -245,7 +246,7 @@ def create_processed_clips(
     if not has_annotations:
         create_labels = False
 
-    # 1. Load and prepare keypoints
+    # Load and prepare keypoints
     # Essential keypoints needed for core processing (normalization, direction detection)
     essential_keypoints = {"HIP", "LEFT_HIP", "RIGHT_HIP", "NECK", "LEFT_SHOULDER", "RIGHT_SHOULDER"}
 
@@ -279,11 +280,13 @@ def create_processed_clips(
     original_keypoints_for_direction = {name: list(coords) for name, coords in keypoints.items()}
     original_keypoints_for_direction = preprocess_keypoints(original_keypoints_for_direction, determined_frame_rate)
 
-    # 2. Smooth and normalize the keypoints
+    # Smooth and normalize the keypoints
     keypoints = preprocess_keypoints(keypoints, determined_frame_rate)
     normalized_keypoints = normalize_coords(keypoints)
 
-    # 3. Identify and split into clips
+
+    # TODO: Add min_segment_length and outlier_ratio from config
+    # Identify and split into clips
     trimmed_valid_range = get_valid_range(
         np.array([coord[0] for coord in keypoints["HIP"]]),
         determined_frame_rate,
@@ -298,8 +301,7 @@ def create_processed_clips(
     # Calculate global ranges that correspond to the original video's frame indices
     global_valid_range = [(start + valid_indices[0], end + valid_indices[0]) for start, end in trimmed_valid_range]
 
-    # 4. Optionally create labels
-    # 4. Optionally create labels
+    # Optionally create labels
     all_labels = None
     if create_labels:
         all_labels = []

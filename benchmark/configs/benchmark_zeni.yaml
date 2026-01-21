@@ -1,10 +1,12 @@
-experiment_name: "Benchmark_LSTM_Baseline_1"
-output_dir: "benchmarkResults/lstm_001"
+experiment_name: "Benchmark_Zeni_Baseline_1"
+output_dir: "benchmarkResults/zeni_001"
 
 preprocessing:
   framerate: 60
   confidence_threshold: 0.4
   exclude_ratio: 0.05
+  min_segment_length: 60
+  outlier_ratio: 0.2
 
   use_filter: true    # Use Butterworth filter for smoothing
 
@@ -13,7 +15,7 @@ preprocessing:
   filter_order: 4
 
 event_detector:
-  method: "NeuralNet" # "NeuralNet" or "Heuristic"
+  method: "Heuristic" # "NeuralNet" or "Heuristic"
 
   neural_net:
     experiment_path: "experiments/LSTM_Baseline_Halpe"
