@@ -374,3 +374,14 @@ if __name__ == "__main__":
 
     data = run_inference_pipeline(config, input_path, output_dir)
     print("Test")
+
+    from gaitStructs import build_phases_from_events
+    from visualizeGaitPhases import visualize_gait_phases, print_statistics
+
+    l_phases, r_phases, support_phases = build_phases_from_events(
+        data["events"],
+        data["global_ranges"]
+    )
+
+    print_statistics(l_phases, r_phases, support_phases)
+    visualize_gait_phases(l_phases, r_phases, support_phases)
