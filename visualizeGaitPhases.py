@@ -9,12 +9,16 @@ def print_statistics(left_phases, right_phases, support_phases):
     def phase_summary(phases, leg):
         stance = [p.duration for p in phases if p.phase_type == PhaseType.STANCE and p.valid]
         swing  = [p.duration for p in phases if p.phase_type == PhaseType.SWING and p.valid]
-        total  = np.mean(stance) + np.mean(swing)
-        stance_pct = (np.mean(stance) / total * 100) if total else 0
-        swing_pct  = (np.mean(swing) / total * 100) if total else 0
+        
+        avg_stance = np.mean(stance) if stance else 0.0
+        avg_swing = np.mean(swing) if swing else 0.0
+        
+        total  = avg_stance + avg_swing
+        stance_pct = (avg_stance / total * 100) if total > 0 else 0.0
+        swing_pct  = (avg_swing / total * 100) if total > 0 else 0.0
         return {
-            "avg_stance": np.mean(stance) if stance else 0,
-            "avg_swing": np.mean(swing) if swing else 0,
+            "avg_stance": avg_stance,
+            "avg_swing": avg_swing,
             "stance_pct": stance_pct,
             "swing_pct": swing_pct
         }
@@ -23,14 +27,19 @@ def print_statistics(left_phases, right_phases, support_phases):
         single_l = [s.duration for s in supports if s.support_type == SupportType.SINGLE_LEFT and s.valid]
         single_r = [s.duration for s in supports if s.support_type == SupportType.SINGLE_RIGHT and s.valid]
         double   = [s.duration for s in supports if s.support_type == SupportType.DOUBLE and s.valid]
-        total = np.mean(single_l) + np.mean(single_r) + np.mean(double)
+        
+        avg_sl = np.mean(single_l) if single_l else 0.0
+        avg_sr = np.mean(single_r) if single_r else 0.0
+        avg_dbl = np.mean(double) if double else 0.0
+        
+        total = avg_sl + avg_sr + avg_dbl
         return {
-            "avg_single_l": np.mean(single_l) if single_l else 0,
-            "avg_single_r": np.mean(single_r) if single_r else 0,
-            "avg_double": np.mean(double) if double else 0,
-            "pct_single_l": (np.mean(single_l)/total*100) if total else 0,
-            "pct_single_r": (np.mean(single_r)/total*100) if total else 0,
-            "pct_double": (np.mean(double)/total*100) if total else 0
+            "avg_single_l": avg_sl,
+            "avg_single_r": avg_sr,
+            "avg_double": avg_dbl,
+            "pct_single_l": (avg_sl/total*100) if total > 0 else 0.0,
+            "pct_single_r": (avg_sr/total*100) if total > 0 else 0.0,
+            "pct_double": (avg_dbl/total*100) if total > 0 else 0.0
         }
 
     # --- Detailed phases ---
@@ -56,7 +65,7 @@ def print_statistics(left_phases, right_phases, support_phases):
     for s in support_phases:
         if not s.valid:
             continue
-        print(f"{s.support_type.value:<15} | {s.start_frame:>5} -> {s.end_frame:<5} | dur={s.duration:<4}")
+        print(f"{s.support_type:<15} | {s.start_frame:>5} -> {s.end_frame:<5} | dur={s.duration:<4}")
 
     # --- Support summary ---
     sup_stats = support_summary(support_phases)
@@ -149,4 +158,3 @@ def visualize_gait_phases(left_phases, right_phases, support_phases, x_start=0, 
 
     plt.tight_layout()
     plt.show()
-
