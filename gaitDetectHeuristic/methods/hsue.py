@@ -1,130 +1,101 @@
-from typing import List, Tuple
-
 import numpy as np
-from matplotlib import pyplot as plt
-
+from ..utils.registry import HEURISTICS
+from ..base import BaseHeuristicDetector
 from gaitStructs import GaitEvent, GaitEventType
-from utils.data import cubic_interpolate_nan, butterworth_filter, find_minima_maxima
+from utils.data import find_minima_maxima, butterworth_filter
 
 
-def gait_detect_hsue(
-    hip: np.ndarray,
-    left_toe: np.ndarray,
-    right_toe: np.ndarray,
-    left_heel: np.ndarray,
-    right_heel: np.ndarray,
-    frame_rate: int = 60,
-    debug: bool = False,
-) -> Tuple[List[GaitEvent], List[GaitEvent]]:
+@HEURISTICS.register
+class Hsue(BaseHeuristicDetector):
     """
-    Detect gait events (heel-strike and toe-off) using the Hsue et al. method.
-
-    Parameters
-    ----------
-    hip : np.ndarray
-        Nx3 array of hip marker positions.
-    left_toe : np.ndarray
-        Nx3 array of left toe marker positions.
-    right_toe : np.ndarray
-        Nx3 array of right toe marker positions.
-    left_heel : np.ndarray
-        Nx3 array of left heel marker positions.
-    right_heel : np.ndarray
-        Nx3 array of right heel marker positions.
-    frame_rate : int, optional
-        Sampling frequency of the motion capture data (default: 60 Hz).
-    debug : bool, optional
-        If True, plots the antero-posterior acceleration and detected peaks.
-
-    Returns
-    -------
-    Tuple[List[GaitEvent], List[GaitEvent]]
-        Two lists of detected gait events:
-        - First list: events for the **left leg**
-        - Second list: events for the **right leg**
+    Implementation of the Hsue et al. method based on antero-posterior acceleration.
     """
 
-    # Interpolate missing values
-    hip = cubic_interpolate_nan(hip)
-    left_toe = cubic_interpolate_nan(left_toe)
-    right_toe = cubic_interpolate_nan(right_toe)
-    left_heel = cubic_interpolate_nan(left_heel)
-    right_heel = cubic_interpolate_nan(right_heel)
+    def get_required_keypoints(self):
+        return ["HIP", "LEFT_FOOT_INDEX", "RIGHT_FOOT_INDEX", "LEFT_HEEL", "RIGHT_HEEL"]
 
-    # Butterworth filter
-    hip = butterworth_filter(hip, cutoff=5, order=4, fs=frame_rate)
+    def detect_events(self, data):
+        # Unpack pre-processed data from the base class
+        hip_x = data["HIP"][:, 0]
+        l_toe_x = data["LEFT_FOOT_INDEX"][:, 0]
+        r_toe_x = data["RIGHT_FOOT_INDEX"][:, 0]
+        l_heel_x = data["LEFT_HEEL"][:, 0]
+        r_heel_x = data["RIGHT_HEEL"][:, 0]
 
-    left_toe_f = butterworth_filter(left_toe, cutoff=2, order=2, fs=frame_rate)
-    right_toe_f = butterworth_filter(right_toe, cutoff=2, order=2, fs=frame_rate)
-    left_heel_f = butterworth_filter(left_heel, cutoff=2, order=2, fs=frame_rate)
-    right_heel_f = butterworth_filter(right_heel, cutoff=2, order=2, fs=frame_rate)
+        # --- Algorithm Params ---
+        # Peak detection parameters
+        min_dist = self.algorithm_params.get("min_peak_distance", 20)
+        prominence = self.algorithm_params.get("prominence", None)
 
-    # Hip velocity for direction
-    grad = np.gradient(hip)
-    vel = [val > 0 for val in grad]
+        # Acceleration curve smoothing parameters
+        foot_cutoff = self.algorithm_params.get("foot_accel_filter_cutoff", 2)
+        foot_order = self.algorithm_params.get("foot_accel_filter_order", 2)
 
-    # Compute antero-posterior acceleration
-    left_toe_accel = np.gradient(np.gradient(left_toe_f, 1.0 / frame_rate), 1.0 / frame_rate)
-    right_toe_accel = np.gradient(np.gradient(right_toe_f, 1.0 / frame_rate), 1.0 / frame_rate)
-    left_heel_accel = np.gradient(np.gradient(left_heel_f, 1.0 / frame_rate), 1.0 / frame_rate)
-    right_heel_accel = np.gradient(np.gradient(right_heel_f, 1.0 / frame_rate), 1.0 / frame_rate)
+        # Determine the direction of walking
+        overall_displacement = hip_x[-1] - hip_x[0]
+        is_moving_right = overall_displacement > 0
 
-    # Detect local maxima and minima using dynamic prominence to get rid of left over noise
-    lt_min, lt_max = find_minima_maxima(left_toe_accel, distance=20, prominence=None)
-    rt_min, rt_max = find_minima_maxima(right_toe_accel, distance=20, prominence=None)
-    lh_min, lh_max = find_minima_maxima(left_heel_accel, distance=20, prominence=None)
-    rh_min, rh_max = find_minima_maxima(right_heel_accel, distance=20, prominence=None)
+        # Apply stronger Butterworth filter to smooth out the data for second derivation
+        l_toe_f = butterworth_filter(l_toe_x, cutoff=foot_cutoff, fs=self.framerate, order=foot_order)
+        r_toe_f = butterworth_filter(r_toe_x, cutoff=foot_cutoff, fs=self.framerate, order=foot_order)
+        l_heel_f = butterworth_filter(l_heel_x, cutoff=foot_cutoff, fs=self.framerate, order=foot_order)
+        r_heel_f = butterworth_filter(r_heel_x, cutoff=foot_cutoff, fs=self.framerate, order=foot_order)
 
-    left_events = []
-    right_events = []
+        # Acceleration Calculation
+        # (dt = 1/fps)
+        dt = 1.0 / self.framerate
 
-    # Heel strike - local minimum of the heel marker when hip velocity is positive
-    # Toe off - local maximum of the toe marker when hip velocity is positive
-    # Left leg
-    for i in [idx for idx, val in enumerate(lt_max) if val is not None and vel[idx]]:
-        left_events.append(GaitEvent(i, GaitEventType.TOE_OFF))
+        def get_accel(arr):
+            return np.gradient(np.gradient(arr, dt), dt)
 
-    for i in [idx for idx, val in enumerate(lh_min) if val is not None and vel[idx]]:
-        left_events.append(GaitEvent(i, GaitEventType.HEEL_STRIKE))
+        l_toe_acc = get_accel(l_toe_f)
+        r_toe_acc = get_accel(r_toe_f)
+        l_heel_acc = get_accel(l_heel_f)
+        r_heel_acc = get_accel(r_heel_f)
 
-    for i in [idx for idx, val in enumerate(lt_min) if val is not None and not vel[idx]]:
-        left_events.append(GaitEvent(i, GaitEventType.TOE_OFF))
+        # Find gait event candidates
+        lt_min, lt_max = find_minima_maxima(l_toe_acc, distance=min_dist, prominence=prominence)
+        rt_min, rt_max = find_minima_maxima(r_toe_acc, distance=min_dist, prominence=prominence)
 
-    for i in [idx for idx, val in enumerate(lh_max) if val is not None and not vel[idx]]:
-        left_events.append(GaitEvent(i, GaitEventType.HEEL_STRIKE))
+        lh_min, lh_max = find_minima_maxima(l_heel_acc, distance=min_dist, prominence=prominence)
+        rh_min, rh_max = find_minima_maxima(r_heel_acc, distance=min_dist, prominence=prominence)
 
-    # Right leg
-    for i in [idx for idx, val in enumerate(rt_max) if val is not None and vel[idx]]:
-        right_events.append(GaitEvent(i, GaitEventType.TOE_OFF))
+        left_events = []
+        right_events = []
 
-    for i in [idx for idx, val in enumerate(rh_min) if val is not None and vel[idx]]:
-        right_events.append(GaitEvent(i, GaitEventType.HEEL_STRIKE))
+        # Helper function for adding events
+        def add_events(indices, event_type, target_list):
+            for i, val in enumerate(indices):
+                if val is not None:
+                    target_list.append(GaitEvent(frame=i, event_type=event_type))
 
-    for i in [idx for idx, val in enumerate(rt_min) if val is not None and not vel[idx]]:
-        right_events.append(GaitEvent(i, GaitEventType.TOE_OFF))
+        # --- DETECTION LOGIC ---
+        if is_moving_right:
+            # ->
 
-    for i in [idx for idx, val in enumerate(rh_max) if val is not None and not vel[idx]]:
-        right_events.append(GaitEvent(i, GaitEventType.HEEL_STRIKE))
+            # Heel Strike: Heel has the minimal local velocity (forward movement velocity is +)
+            add_events(lh_min, GaitEventType.HEEL_STRIKE, left_events)  # HS = Valley
+            add_events(rh_min, GaitEventType.HEEL_STRIKE, right_events)
 
-    if debug:
-        plt.subplot(2,1,1)
-        plt.plot(left_toe_accel, label="Left Toe Accel", color="red")
-        plt.plot(left_heel_accel, label="Left Heel Accel", color="blue")
-        plt.plot(lt_min, "x", color='red')
-        plt.plot(lt_max, "x", color='green')
-        plt.plot(lh_min, "x", color='red')
-        plt.plot(lh_max, "x", color='green')
-        plt.legend()
 
-        plt.subplot(2,1,2)
-        plt.plot(right_toe_accel, label="Right Toe Accel", color="red")
-        plt.plot(right_heel_accel, label="Right Heel Accel", color="blue")
-        plt.plot(rt_min, "x", color='red')
-        plt.plot(rt_max, "x", color='green')
-        plt.plot(rh_min, "x", color='red')
-        plt.plot(rh_max, "x", color='green')
-        plt.legend()
+            # Toe Off: Toe has the maximum local velocity (forward movement velocity is +)
+            add_events(lt_max, GaitEventType.TOE_OFF, left_events)      # TO = Peak
+            add_events(rt_max, GaitEventType.TOE_OFF, right_events)
 
-        plt.show()
+        else:
+            # <-
 
-    return left_events, right_events
+            # Heel Strike: Heel has the maximum local velocity (forward movement velocity is -)
+            add_events(lh_max, GaitEventType.HEEL_STRIKE, left_events)   # HS = Peak
+            add_events(rh_max, GaitEventType.HEEL_STRIKE, right_events)
+
+            # Toe Off: Toe has the minimal local velocity (forward movement velocity is -)
+            add_events(lt_min, GaitEventType.TOE_OFF, left_events)      # TO = Valley
+            add_events(rt_min, GaitEventType.TOE_OFF, right_events)
+
+        # Sort and return values
+        left_events.sort(key=lambda x: x.frame)
+        right_events.sort(key=lambda x: x.frame)
+
+
+        return left_events, right_events

@@ -1,0 +1,50 @@
+experiment_name: "Benchmark_Hsue_Baseline_1"
+output_dir: "benchmarkResults/hsue_001"
+
+preprocessing:
+  framerate: 60
+  confidence_threshold: 0.4
+  exclude_ratio: 0.1
+  min_segment_length: 60
+  outlier_ratio: 0.2
+
+  use_filter: true    # Use Butterworth filter for smoothing
+
+  # Butterworth filter params
+  filter_cutoff: 6
+  filter_order: 4
+
+event_detector:
+  method: "Heuristic" # "NeuralNet" or "Heuristic"
+
+  neural_net:
+    experiment_path: "experiments/LSTM_Baseline_Halpe"
+    checkpoint: "best_model.pth"
+
+    post_processing:
+      threshold: 0.6
+      min_distance_sec: 0.25
+
+  heuristic:
+    method: "Hsue"
+    skeleton: "HALPE"
+    seed: 3
+    train_split: 0.8
+    params:
+      # Peak detection parameters
+      min_peak_distance: 20
+      prominence: null
+
+      # Extra Butterworth smoothing filter for second derivative
+      foot_accel_filter_cutoff: 2
+      foot_accel_filter_order: 2
+
+data:
+  dataset_root: "dataset/PROCESSED"
+  annotation_root: "annotations"
+
+  # If true, the whole dataset is used, if false, only the validation part of the seed is used.
+  use_full_dataset: False
+
+evaluation:
+  tolerance_ms: 150       # Match tolerance

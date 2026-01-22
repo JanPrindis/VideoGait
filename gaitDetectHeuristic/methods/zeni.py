@@ -20,10 +20,9 @@ class Zeni(BaseHeuristicDetector):
         l_heel_x = data["LEFT_HEEL"][:, 0]
         r_heel_x = data["RIGHT_HEEL"][:, 0]
 
-        # Model specific parameters
+        # --- Algorithm Params ---
         min_dist = self.algorithm_params.get("min_peak_distance", 20)
         prominence = self.algorithm_params.get("prominence", 10)
-        motion_threshold = self.algorithm_params.get("motion_threshold", 0.5)
 
         # Determine the direction of walking
         overall_displacement = hip_x[-1] - hip_x[0]
@@ -53,24 +52,24 @@ class Zeni(BaseHeuristicDetector):
 
         # --- DETECTION LOGIC ---
         if is_moving_right:
-            # SMĚR DOPRAVA (X roste) ->
+            # ->
 
-            # Heel Strike: Pata je max vepředu (Max X)
+            # Heel Strike: Heel has a maximum distance to the hip (Max X)
             add_events(lh_max, GaitEventType.HEEL_STRIKE, left_events)
             add_events(rh_max, GaitEventType.HEEL_STRIKE, right_events)
 
-            # Toe Off: Špička je max vzadu (Min X)
+            # Toe Off: Toe has a minimum distance to the hip (Min X)
             add_events(lt_min, GaitEventType.TOE_OFF, left_events)
             add_events(rt_min, GaitEventType.TOE_OFF, right_events)
 
         else:
-            # SMĚR DOLEVA (X klesá) <-
+            # <-
 
-            # Heel Strike: Pata je max vepředu/vlevo (Min X)
+            # Heel Strike: Heel has a minimum distance to the hip (Min X)
             add_events(lh_min, GaitEventType.HEEL_STRIKE, left_events)
             add_events(rh_min, GaitEventType.HEEL_STRIKE, right_events)
 
-            # Toe Off: Špička je max vzadu/vpravo (Max X)
+            # Toe Off: Toe has a maximum distance to the hip (Max X)
             add_events(lt_max, GaitEventType.TOE_OFF, left_events)
             add_events(rt_max, GaitEventType.TOE_OFF, right_events)
 
