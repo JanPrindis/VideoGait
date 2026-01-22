@@ -258,8 +258,6 @@ def run_benchmark():
     titles = ["Heel Strike", "Toe Off"]
     colors = ["#3498db", "#e74c3c"]
 
-    max_count = 0
-
     for ax, event, title, color in zip(axes, events, titles, colors):
         subset = df_hist[df_hist["Type"] == event]
 
@@ -298,6 +296,65 @@ def run_benchmark():
 
     plt.tight_layout()
     plt.savefig(os.path.join(out_dir, "error_distribution_hist.png"))
+
+    # --- Error Distribution (Time in ms) ---
+    rep_fps = df_raw['FPS'].mode()[0] if not df_raw.empty else 60.0
+
+    fig, axes = plt.subplots(1, 2, figsize=(8, 4), sharey=True)
+
+    events = [GaitEventType.HEEL_STRIKE.value, GaitEventType.TOE_OFF.value]
+    titles = ["Heel Strike", "Toe Off"]
+    colors = ["#3498db", "#e74c3c"]
+
+    for ax, event, title, color in zip(axes, events, titles, colors):
+        subset = df_hist[df_hist["Type"] == event]
+
+        if subset.empty:
+            continue
+
+        min_err = int(subset['ErrorFrames'].min())
+        max_err = int(subset['ErrorFrames'].max())
+        full_range = range(min_err, max_err + 1)
+
+        counts = subset['ErrorFrames'].value_counts().reindex(full_range, fill_value=0)
+        dist_data = counts.reset_index()
+        dist_data.columns = ['ErrorFrames', 'Count']
+
+        sns.barplot(
+            data=dist_data, x="ErrorFrames", y="Count",
+            ax=ax, color=color, edgecolor="black", alpha=0.8
+        )
+
+        step_frames = max(1, int(round(0.05 * rep_fps)))
+
+        ticks_idx = []
+        ticks_labels = []
+
+        for i, frame_val in enumerate(full_range):
+            if frame_val % step_frames == 0:
+                ticks_idx.append(i)
+                ms_val = frame_val * (1000.0 / rep_fps)
+                ticks_labels.append(f"{int(ms_val)}")
+
+        ax.set_xticks(ticks_idx)
+        ax.set_xticklabels(ticks_labels)
+
+        if 0 in full_range:
+            zero_idx = list(full_range).index(0)
+            ax.axvline(x=zero_idx, color='black', linestyle='--', linewidth=1.5, alpha=0.6, label="Zero Error")
+
+        ax.set_title(f"{title}", fontweight='bold')
+        ax.set_xlabel("Error (ms)")
+        ax.grid(axis='y', linestyle='--', alpha=0.5)
+
+        if ax == axes[0]:
+            ax.set_ylabel("Frequency")
+        else:
+            ax.set_ylabel("")
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(out_dir, "error_distribution_hist_ms.png"))
+    plt.close()
 
     print(f"\n[Success] All results saved to: {out_dir}")
     print(f" - Plots generated with FULL DATA (Outliers visible)")
