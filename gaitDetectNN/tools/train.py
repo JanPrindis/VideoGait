@@ -200,12 +200,16 @@ def main():
 
     preprocess_args = {
         "skeleton_definition": skeleton_def,
-        "confidence_threshold": cfg['data'].get('confidence_threshold', 0.5),
-        "exclude_ratio": cfg['data'].get('exclude_ratio', 0.1),
+        "confidence_threshold": cfg['preprocessing'].get('confidence_threshold', 0.4),
+        "exclude_ratio": cfg['preprocessing'].get('exclude_ratio', 0.1),
+        "min_segment_length": cfg['preprocessing'].get('min_segment_length', 60),
+        "outlier_ratio": cfg['preprocessing'].get('outlier_ratio', 0.2),
+        "filter_cutoff": cfg['preprocessing'].get('filter_cutoff', 6),
+        "filter_order": cfg['preprocessing'].get('filter_order', 4),
         "keypoints": cfg['data']['features']['keypoints'],
         "kinematics_keypoints": cfg['data']['features']['kinematics'],
         "angle_triplets": cfg['data']['features']['angles'],
-        "distance_pairs": cfg['data']['features']['distances']
+        "distance_pairs": cfg['data']['features']['distances'],
     }
 
     # Loaders

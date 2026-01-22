@@ -22,7 +22,9 @@ def get_valid_range(
         frame_rate: float,
         exclude_percent: float = 0.1,
         min_segment_length: int = 60,
-        outlier_ratio: float = 0.2
+        outlier_ratio: float = 0.2,
+        filter_cutoff: int = 5,
+        filter_order: int = 4
 ):
     # Safety check - length too short
     if len(hip) < max(20, min_segment_length):
@@ -31,9 +33,8 @@ def get_valid_range(
     # Preprocessing
     hip = cubic_interpolate_nan(hip)
 
-    # TODO: Pull parameters from config
     try:
-        hip_f = butterworth_filter(hip, cutoff=5, order=4, fs=frame_rate)
+        hip_f = butterworth_filter(hip, cutoff=filter_cutoff, order=filter_order, fs=frame_rate)
     except ValueError:
         return []
 

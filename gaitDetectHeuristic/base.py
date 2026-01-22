@@ -100,7 +100,9 @@ class BaseHeuristicDetector(ABC):
             self.framerate,
             exclude_percent=self.exclude_ratio,
             min_segment_length=self.min_segment_length,
-            outlier_ratio=self.outlier_ratio
+            outlier_ratio=self.outlier_ratio,
+            filter_cutoff=self.filter_cutoff,
+            filter_order=self.filter_order
         )
 
         return hip_data, valid_ranges, is_virtual_hip, global_offset

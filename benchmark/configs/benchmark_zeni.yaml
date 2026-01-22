@@ -4,7 +4,7 @@ output_dir: "benchmarkResults/zeni_001"
 preprocessing:
   framerate: 60
   confidence_threshold: 0.4
-  exclude_ratio: 0.05
+  exclude_ratio: 0.1
   min_segment_length: 60
   outlier_ratio: 0.2
 

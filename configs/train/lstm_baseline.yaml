@@ -1,5 +1,15 @@
 experiment_name: "LSTM_Baseline_Halpe"
 
+preprocessing:
+  confidence_threshold: 0.4
+  exclude_ratio: 0.1
+  min_segment_length: 60
+  outlier_ratio: 0.2
+
+  # Butterworth filter params
+  filter_cutoff: 6
+  filter_order: 4
+
 data:
   # Relative path from PROJECT_ROOT
   dataset_root: "dataset/PROCESSED"
@@ -9,7 +19,6 @@ data:
   skeleton: "HALPE"
   train_split: 0.8
   num_workers: 0
-  confidence_threshold: 0.5
 
   features:
     keypoints:

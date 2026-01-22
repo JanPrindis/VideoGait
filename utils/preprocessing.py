@@ -43,13 +43,15 @@ def get_valid_annotations(annotations_json_path, valid_range):
     return {"metadata": full_annotations["metadata"], "annotations": filtered_annotations}
 
 
-def preprocess_keypoints(keypoints: dict, frame_rate: float):
+def preprocess_keypoints(keypoints: dict, frame_rate: float, filter_cutoff: int = 5, filter_order: int = 4):
     """
     Applies cubic interpolation and a Butterworth filter to smooth keypoint data.
 
     Args:
         keypoints (dict): The dictionary of keypoint lists.
         frame_rate (float): The frame rate of the video for the filter.
+        filter_cutoff: The cutoff parameter of Butterworth filter.
+        filter_order: The order parameter of Butterworth filter.
 
     Returns:
         dict: The dictionary with smoothed keypoint data.
@@ -65,14 +67,13 @@ def preprocess_keypoints(keypoints: dict, frame_rate: float):
         y_coords = [c[1] if c is not None else None for c in coords_list]
         conf_scores = [c[2] if c is not None else None for c in coords_list]
 
-        # TODO: Make it so the filter parameters are pulled form config file
         # Interpolate and filter X coordinates
         x_processed = cubic_interpolate_nan(x_coords)
-        x_processed = butterworth_filter(x_processed, cutoff=5, order=4, fs=frame_rate)
+        x_processed = butterworth_filter(x_processed, cutoff=filter_cutoff, order=filter_order, fs=frame_rate)
 
         # Interpolate and filter Y coordinates
         y_processed = cubic_interpolate_nan(y_coords)
-        y_processed = butterworth_filter(y_processed, cutoff=5, order=4, fs=frame_rate)
+        y_processed = butterworth_filter(y_processed, cutoff=filter_cutoff, order=filter_order, fs=frame_rate)
 
         # Recombine into list of tuples, keeping original confidence
         processed_keypoints[name] = list(zip(x_processed.tolist(), y_processed.tolist(), conf_scores))
@@ -225,7 +226,11 @@ def create_processed_clips(
         skeleton_definition,
         required_keypoints: list,
         confidence_threshold: float = 0.5,
+        filter_cutoff: int = 5,               # Butterworth filter config
+        filter_order: int = 4,                # -------------------------
         exclude_ratio: float = 0.1,
+        min_segment_length: int = 60,         # Ignore small clips
+        outlier_ratio: float = 0.2,           # ------------------
         annotations_path: str | None = None,  # Now fully optional
         frame_rate: float | None = None,      # Optional, but required if annotations are missing
         create_labels: bool = True
@@ -278,19 +283,27 @@ def create_processed_clips(
 
     # Copy the original keypoints for direction detection later
     original_keypoints_for_direction = {name: list(coords) for name, coords in keypoints.items()}
-    original_keypoints_for_direction = preprocess_keypoints(original_keypoints_for_direction, determined_frame_rate)
+    original_keypoints_for_direction = preprocess_keypoints(
+        original_keypoints_for_direction,
+        determined_frame_rate,
+        filter_cutoff,
+        filter_order
+    )
 
     # Smooth and normalize the keypoints
-    keypoints = preprocess_keypoints(keypoints, determined_frame_rate)
+    keypoints = preprocess_keypoints(keypoints, determined_frame_rate, filter_cutoff, filter_order)
     normalized_keypoints = normalize_coords(keypoints)
 
 
-    # TODO: Add min_segment_length and outlier_ratio from config
     # Identify and split into clips
     trimmed_valid_range = get_valid_range(
         np.array([coord[0] for coord in keypoints["HIP"]]),
         determined_frame_rate,
-        exclude_ratio
+        exclude_ratio,
+        min_segment_length,
+        outlier_ratio,
+        filter_cutoff,
+        filter_order
     )
     clips = create_clips(
         normalized_keypoints=normalized_keypoints,
@@ -450,6 +463,10 @@ def generate_features(
         skeleton_definition,
         confidence_threshold: float,
         exclude_ratio: float,
+        filter_cutoff: int = 5,         # Butterworth filter config
+        filter_order: int = 4,          # -------------------------
+        min_segment_length: int = 60,   # Ignore small clips
+        outlier_ratio: float = 0.2,     # ------------------
         annotations_path: str | None = None,
         frame_rate: float | None = None,
         keypoints: list | None = None,
@@ -468,7 +485,11 @@ def generate_features(
         required_keypoints=keypoints,
         confidence_threshold=confidence_threshold,
         exclude_ratio=exclude_ratio,
-        create_labels=bool(annotations_path) # Only create labels if path is given
+        create_labels=bool(annotations_path), # Only create labels if path is given
+        outlier_ratio=outlier_ratio,
+        min_segment_length=min_segment_length,
+        filter_cutoff=filter_cutoff,
+        filter_order=filter_order
     )
 
     if not clips_raw:
@@ -528,7 +549,6 @@ if __name__ == "__main__":
         angle_triplets=required_angles,
         distance_pairs=required_distances,
     )
-
 
     clips, labels, _ = create_processed_clips(
         keypoints_path=keypoints_path,

@@ -279,12 +279,16 @@ def run_inference_pipeline(
 
     preprocess_args = {
         "skeleton_definition": skeleton_def,
-        "confidence_threshold": train_cfg['data'].get('confidence_threshold', 0.5),
-        "exclude_ratio": train_cfg['data'].get('exclude_ratio', 0.1),
+        "confidence_threshold": cfg['preprocessing'].get('confidence_threshold', 0.5),
+        "exclude_ratio": cfg['preprocessing'].get('exclude_ratio', 0.1),
         "keypoints": feat_def['keypoints'],
         "kinematics_keypoints": feat_def['kinematics'],
         "angle_triplets": feat_def['angles'],
-        "distance_pairs": feat_def['distances']
+        "distance_pairs": feat_def['distances'],
+        "filter_cutoff": train_cfg['preprocessing'].get('filter_cutoff', 6),
+        "filter_order": train_cfg['preprocessing'].get('filter_order', 4),
+        "min_segment_length": train_cfg['preprocessing'].get('min_segment_length', 60),
+        "outlier_ratio": train_cfg['preprocessing'].get('outlier_ratio', 0.2)
     }
 
     # Run data preprocessing
