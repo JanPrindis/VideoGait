@@ -24,7 +24,7 @@ pose_detector:
 # Gait event detection
 event_detector:
   #"NeuralNet" or "Heuristic"
-  method: "NeuralNet"
+  method: "Heuristic"
 
   # NeuralNet configuration
   neural_net:
