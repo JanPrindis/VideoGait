@@ -244,64 +244,10 @@ def run_benchmark():
     plt.tight_layout()
     plt.savefig(os.path.join(out_dir, "accuracy_boxplot_ms.png"))
 
-    # Error Distribution
+    # Error Distribution (Frames)
     df_hist = df_raw.copy()
 
-    # Get X range
-    min_err = int(df_hist['ErrorFrames'].min())
-    max_err = int(df_hist['ErrorFrames'].max())
-    x_range = list(range(min_err, max_err + 1))
-
-    fig, axes = plt.subplots(1, 2, figsize=(8, 4), sharey=True)
-
-    events = [GaitEventType.HEEL_STRIKE.value, GaitEventType.TOE_OFF.value]
-    titles = ["Heel Strike", "Toe Off"]
-    colors = ["#3498db", "#e74c3c"]
-
-    for ax, event, title, color in zip(axes, events, titles, colors):
-        subset = df_hist[df_hist["Type"] == event]
-
-        # Count occurrences
-        dist_data = subset.groupby('ErrorFrames').size().reset_index(name='Count')
-
-        if dist_data.empty:
-            continue
-
-        sns.barplot(
-            data=dist_data, x="ErrorFrames", y="Count",
-            ax=ax,
-            color=color, edgecolor="black", alpha=0.8
-        )
-
-        # Find bar for value 0
-        if 0 in dist_data['ErrorFrames'].values:
-            zero_idx = dist_data.index[dist_data['ErrorFrames'] == 0][0]
-
-            # Draw vertical line representing 0 error
-            ax.axvline(x=zero_idx, color='black', linestyle='--', linewidth=1.5, alpha=0.6, label="Zero Error")
-
-        ax.set_title(title, fontweight='bold')
-        ax.set_xlabel("Error (Frames)")
-        ax.grid(axis='y', linestyle='--', alpha=0.5)
-
-        # Force integer ticks on X axis if range is small
-        if len(x_range) < 20:
-            ax.set_xticks(range(len(dist_data)))
-            ax.set_xticklabels(dist_data['ErrorFrames'].astype(int))
-
-        if ax == axes[0]:
-            ax.set_ylabel("Frequency")
-        else:
-            ax.set_ylabel("")
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, "error_distribution_hist.png"))
-
-    # --- Error Distribution (Time in ms) ---
-    rep_fps = df_raw['FPS'].mode()[0] if not df_raw.empty else 60.0
-
-    fig, axes = plt.subplots(1, 2, figsize=(8, 4), sharey=True)
-
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5), sharey=True)
     events = [GaitEventType.HEEL_STRIKE.value, GaitEventType.TOE_OFF.value]
     titles = ["Heel Strike", "Toe Off"]
     colors = ["#3498db", "#e74c3c"]
@@ -312,11 +258,71 @@ def run_benchmark():
         if subset.empty:
             continue
 
-        min_err = int(subset['ErrorFrames'].min())
-        max_err = int(subset['ErrorFrames'].max())
-        full_range = range(min_err, max_err + 1)
+        # Determine Range
+        vals = subset['ErrorFrames'].astype(int)
+        min_val = vals.min()
+        max_val = vals.max()
 
-        counts = subset['ErrorFrames'].value_counts().reindex(full_range, fill_value=0)
+        plot_min = min(min_val, 0) - 2
+        plot_max = max(max_val, 0) + 2
+        full_range = list(range(plot_min, plot_max + 1))
+
+        # Fill missing values
+        counts = vals.value_counts().reindex(full_range, fill_value=0)
+        dist_data = counts.reset_index()
+        dist_data.columns = ['ErrorFrames', 'Count']
+
+        # Plot
+        sns.barplot(
+            data=dist_data, x="ErrorFrames", y="Count",
+            ax=ax, color=color, edgecolor="black", alpha=0.8
+        )
+
+        # Ticks
+        tick_idxs = range(len(full_range))
+        tick_labels = full_range
+
+        ax.set_xticks(tick_idxs)
+        ax.set_xticklabels(tick_labels, rotation=0)  # No rotation needed usually
+
+        # Zero Line
+        if 0 in full_range:
+            zero_idx = full_range.index(0)
+            ax.axvline(x=zero_idx, color='black', linestyle='--', linewidth=1.5, alpha=0.6, label="Zero Error")
+
+        ax.set_title(title, fontweight='bold')
+        ax.set_xlabel("Error (Frames)")
+        if ax == axes[0]:
+            ax.set_ylabel("Frequency")
+        else:
+            ax.set_ylabel("")
+        ax.grid(axis='y', linestyle='--', alpha=0.5)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(out_dir, "error_distribution_hist.png"))
+    plt.close()
+
+    # Error Distribution (Time in ms)
+    rep_fps = df_raw['FPS'].mode()[0] if not df_raw.empty else 60.0
+
+    fig, axes = plt.subplots(1, 2, figsize=(10, 5), sharey=True)
+
+    for ax, event, title, color in zip(axes, events, titles, colors):
+        subset = df_hist[df_hist["Type"] == event]
+
+        if subset.empty:
+            continue
+
+        # Fill gaps
+        vals = subset['ErrorFrames'].astype(int)
+        min_val = vals.min()
+        max_val = vals.max()
+
+        plot_min = min(min_val, 0) - 2
+        plot_max = max(max_val, 0) + 2
+        full_range = list(range(plot_min, plot_max + 1))
+
+        counts = vals.value_counts().reindex(full_range, fill_value=0)
         dist_data = counts.reset_index()
         dist_data.columns = ['ErrorFrames', 'Count']
 
@@ -325,32 +331,52 @@ def run_benchmark():
             ax=ax, color=color, edgecolor="black", alpha=0.8
         )
 
-        step_frames = max(1, int(round(0.05 * rep_fps)))
+        # Ticks every 50ms
+        bin_times = [f * (1000.0 / rep_fps) for f in full_range]
+        min_time = min(bin_times)
+        max_time = max(bin_times)
 
-        ticks_idx = []
-        ticks_labels = []
+        targets = []
+        curr = 0
 
-        for i, frame_val in enumerate(full_range):
-            if frame_val % step_frames == 0:
-                ticks_idx.append(i)
-                ms_val = frame_val * (1000.0 / rep_fps)
-                ticks_labels.append(f"{int(ms_val)}")
+        # Positive & Zero
+        while curr <= max_time + 40:  # + buffer
+            targets.append(curr)
+            curr += 50
 
-        ax.set_xticks(ticks_idx)
-        ax.set_xticklabels(ticks_labels)
+        # Negative
+        curr = -50
+        while curr >= min_time - 40:
+            targets.append(curr)
+            curr -= 50
+        targets.sort()
+
+        # Find the closest bin index for each target
+        tick_idxs = []
+        tick_labels = []
+
+        for t in targets:
+            closest_idx = min(range(len(bin_times)), key=lambda i: abs(bin_times[i] - t))
+
+            # Avoid duplicate ticks if resolution is low
+            if closest_idx not in tick_idxs:
+                tick_idxs.append(closest_idx)
+                tick_labels.append(str(t))
+
+        ax.set_xticks(tick_idxs)
+        ax.set_xticklabels(tick_labels)
 
         if 0 in full_range:
-            zero_idx = list(full_range).index(0)
+            zero_idx = full_range.index(0)
             ax.axvline(x=zero_idx, color='black', linestyle='--', linewidth=1.5, alpha=0.6, label="Zero Error")
 
         ax.set_title(f"{title}", fontweight='bold')
         ax.set_xlabel("Error (ms)")
-        ax.grid(axis='y', linestyle='--', alpha=0.5)
-
         if ax == axes[0]:
             ax.set_ylabel("Frequency")
         else:
             ax.set_ylabel("")
+        ax.grid(axis='y', linestyle='--', alpha=0.5)
 
     plt.tight_layout()
     plt.savefig(os.path.join(out_dir, "error_distribution_hist_ms.png"))
