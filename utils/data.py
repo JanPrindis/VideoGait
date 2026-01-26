@@ -148,11 +148,41 @@ def cubic_interpolate_nan(data):
         print(f"[Warning] Interpolation failed: {e}")
         return y
 
+
 def butterworth_filter(data, cutoff=5, fs=60.0, order=5):
-    normal_cutoff = cutoff / (fs / 2)
-    b, a = butter(order, normal_cutoff, btype='low')
-    y = filtfilt(b, a, data)
-    return np.array(y)
+
+    # Check if data exists
+    if data is None or len(data) == 0:
+        return np.array([]) if data is None else data
+
+    y = np.array(data)
+
+    # Check data length
+    # filtfilt requires 'padlen', which is 3 * (max(len(a), len(b)) - 1).
+    if len(y) <= 3 * order:
+        # Not enough data
+        print("[Warning] Butterworth filter: Input data sequence to short, returning original!")
+        return y
+
+    # Nyquist frequency check
+    nyquist = fs / 2
+    if cutoff >= nyquist:
+        # Frequency is higher than what we are able to filter - Fallback to .99 * nyquist
+        cutoff = 0.99 * nyquist
+        print(f"[Warning] Butterworth filter: Cutoff frequency is too high, using 0.99 * nyquist = {cutoff}!")
+
+    if cutoff <= 0:
+        return y
+
+    # Filtration
+    try:
+        normal_cutoff = cutoff / nyquist
+        b, a = butter(order, normal_cutoff, btype='low')
+        y_filtered = filtfilt(b, a, y)
+        return np.array(y_filtered)
+    except ValueError as e:
+        print(f"[Error] Butterworth filter: {e}")
+        return y
 
 
 def find_minima_maxima(data, distance=20, prominence=None, rel_prominence=0.3):
