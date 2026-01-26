@@ -33,7 +33,6 @@ event_detector:
     params:
       min_peak_distance: 20
       prominence: 10
-      motion_threshold: 0.1 # Pixels per frame
 
 data:
   dataset_root: "dataset/PROCESSED"
