@@ -17,7 +17,18 @@ class Bonci(BaseHeuristicDetector):
     def get_required_keypoints(self):
         return ["HIP", "LEFT_FOOT_INDEX", "RIGHT_FOOT_INDEX", "LEFT_HEEL", "RIGHT_HEEL"]
 
-    def detect_events(self, data):
+    def detect_events(self, processed_data, plot_path: str = None, sequence_number: int = 1):
+        """
+        Detects gait events using the Bonci et al. method.
+
+        Args:
+            processed_data (dict): A dictionary of processed keypoint data (numpy arrays).
+            plot_path (str, optional): Path to save debug plots. Defaults to None.
+            sequence_number (int, optional): Sequence identifier for file naming. Defaults to 1.
+
+        Returns:
+            tuple: Two lists (left_events, right_events) containing detected GaitEvent objects.
+        """
         # --- Zeni et al. wrapper ---
         # Get Zeni params from config file
         zeni_specific_params = self.algorithm_params.get("zeni_params", {})
@@ -38,7 +49,7 @@ class Bonci(BaseHeuristicDetector):
         base_detector = Zeni(zeni_config)
 
         # Get base detector events
-        base_left, base_right = base_detector.detect_events(data)
+        base_left, base_right = base_detector.detect_events(processed_data, plot_path, sequence_number)
 
         # --- Calculate walking speed from hip movement ---
         dt = 1.0 / self.framerate
@@ -142,63 +153,71 @@ class Bonci(BaseHeuristicDetector):
         refined_right.sort(key=lambda x: x.frame)
 
         # --- DEBUG PLOT START ---
-        # import matplotlib.pyplot as plt
-        #
-        # fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
-        # fig.suptitle(f"Bonci (2022) | Walking Speed: {walking_speed:.2f} px/s", fontsize=14)
-        #
-        # # Helper - visualize single leg
-        # def plot_leg_debug(ax, title, heel_vel, toe_vel, base_events, refined_events, side_color):
-        #     ax.set_title(title)
-        #
-        #     # Velocity signals
-        #     ax.plot(heel_vel, label="Heel Vel", color='blue', alpha=0.7, linewidth=1.5)
-        #     ax.plot(toe_vel, label="Toe Vel", color='green', alpha=0.7, linewidth=1.5)
-        #
-        #     # Thresholds
-        #     ax.axhline(y=hs_thresh, color='blue', linestyle='--', alpha=0.4, label="HS Thresh")
-        #     ax.axhline(y=to_thresh, color='green', linestyle='--', alpha=0.4, label="TO Thresh")
-        #
-        #     # Search window
-        #     window_label_added = False
-        #     for e in base_events:
-        #         if e.event_type == GaitEventType.TOE_OFF:
-        #             if toe_vel[e.frame] > to_thresh:
-        #                 start = max(0, e.frame - search_window_size)
-        #                 end = min(len(heel_vel), e.frame + search_window_size)
-        #
-        #                 label = "Search Window" if not window_label_added else None
-        #                 ax.axvspan(start, end, color='gold', alpha=0.2, label=label)
-        #                 window_label_added = True
-        #
-        #     # Original Zeni detected events
-        #     base_hs = [e.frame for e in base_events if e.event_type == GaitEventType.HEEL_STRIKE]
-        #     base_to = [e.frame for e in base_events if e.event_type == GaitEventType.TOE_OFF]
-        #
-        #     if base_hs: ax.scatter(base_hs, [heel_vel[i] for i in base_hs], c='gray', marker='v', s=100, alpha=0.8,
-        #                            label="Zeni Base")
-        #     if base_to: ax.scatter(base_to, [toe_vel[i] for i in base_to], c='gray', marker='^', s=100, alpha=0.8)
-        #
-        #     # Refined events
-        #     for e in refined_events:
-        #         if e.event_type == GaitEventType.HEEL_STRIKE:
-        #             ax.scatter(e.frame, heel_vel[e.frame], c='red', marker='v', s=100, zorder=5, edgecolors='black',
-        #                        label="HS Final")
-        #         elif e.event_type == GaitEventType.TOE_OFF:
-        #             ax.scatter(e.frame, toe_vel[e.frame], c='orange', marker='^', s=100, zorder=5, edgecolors='black',
-        #                        label="TO Final")
-        #
-        #     # Legend
-        #     handles, labels = ax.get_legend_handles_labels()
-        #     by_label = dict(zip(labels, handles))
-        #     ax.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize='small')
-        #     ax.grid(True, alpha=0.3)
-        #
-        # plot_leg_debug(axs[0], "Left Leg Analysis", l_heel_vel, l_toe_vel, base_left, refined_left, 'blue')
-        # plot_leg_debug(axs[1], "Right Leg Analysis", r_heel_vel, r_toe_vel, base_right, refined_right, 'red')
-        #
-        # plt.tight_layout()
-        # plt.show()
-        # --- DEBUG PLOT END ---
+        if plot_path is not None and self.save_debug_plot:
+            file_name = "bonci_clip_" + str(sequence_number) + ".png"
+            path = os.path.join(plot_path, file_name)
+
+            import matplotlib.pyplot as plt
+
+            fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
+            fig.suptitle(f"Bonci (2022) | Walking Speed: {walking_speed:.2f} px/s", fontsize=14)
+
+            # Helper - visualize single leg
+            def plot_leg_debug(ax, title, heel_vel, toe_vel, base_events, refined_events, side_color):
+                ax.set_title(title)
+                ax.set_ylabel('Velocity (px/s)', color=side_color)
+                ax.set_xlabel('Frame Index')
+
+                # Velocity signals
+                ax.plot(heel_vel, label="Heel Vel", color='blue', alpha=0.7, linewidth=1.5)
+                ax.plot(toe_vel, label="Toe Vel", color='green', alpha=0.7, linewidth=1.5)
+
+                # Thresholds
+                ax.axhline(y=hs_thresh, color='blue', linestyle='--', alpha=0.4, label="HS Thresh")
+                ax.axhline(y=to_thresh, color='green', linestyle='--', alpha=0.4, label="TO Thresh")
+
+                # Search window
+                window_label_added = False
+                for e in base_events:
+                    if e.event_type == GaitEventType.TOE_OFF:
+                        if toe_vel[e.frame] > to_thresh:
+                            start = max(0, e.frame - search_window_size)
+                            end = min(len(heel_vel), e.frame + search_window_size)
+
+                            label = "Search Window" if not window_label_added else None
+                            ax.axvspan(start, end, color='gold', alpha=0.2, label=label)
+                            window_label_added = True
+
+                # Original Zeni detected events
+                base_hs = [e.frame for e in base_events if e.event_type == GaitEventType.HEEL_STRIKE]
+                base_to = [e.frame for e in base_events if e.event_type == GaitEventType.TOE_OFF]
+
+                if base_hs: ax.scatter(base_hs, [heel_vel[i] for i in base_hs], c='gray', marker='v', s=100, alpha=0.8,
+                                       label="Zeni Base")
+                if base_to: ax.scatter(base_to, [toe_vel[i] for i in base_to], c='gray', marker='^', s=100, alpha=0.8)
+
+                # Refined events
+                for e in refined_events:
+                    if e.event_type == GaitEventType.HEEL_STRIKE:
+                        ax.scatter(e.frame, heel_vel[e.frame], c='red', marker='v', s=100, zorder=5, edgecolors='black',
+                                   label="HS Final")
+                    elif e.event_type == GaitEventType.TOE_OFF:
+                        ax.scatter(e.frame, toe_vel[e.frame], c='orange', marker='^', s=100, zorder=5, edgecolors='black',
+                                   label="TO Final")
+
+                # Legend
+                handles, labels = ax.get_legend_handles_labels()
+                by_label = dict(zip(labels, handles))
+                ax.legend(by_label.values(), by_label.keys(), loc='upper right', fontsize='small')
+                ax.grid(True, alpha=0.3)
+
+            plot_leg_debug(axs[0], "Left Leg Analysis", l_heel_vel, l_toe_vel, base_left, refined_left, 'blue')
+            plot_leg_debug(axs[1], "Right Leg Analysis", r_heel_vel, r_toe_vel, base_right, refined_right, 'red')
+
+            plt.tight_layout()
+            plt.savefig(path, dpi=150)
+            plt.close()
+            print(f"[Output] Plot saved to: {path}")
+            # --- DEBUG PLOT END ---
 
         return refined_left, refined_right

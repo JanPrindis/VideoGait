@@ -16,16 +16,27 @@ class Desailly(BaseHeuristicDetector):
         return ["HIP", "LEFT_FOOT_INDEX", "RIGHT_FOOT_INDEX", "LEFT_HEEL", "RIGHT_HEEL",
                 "LEFT_KNEE", "RIGHT_KNEE"]
 
-    def detect_events(self, data):
-        # Unpack pre-processed data
-        hip_x = data["HIP"][:, 0]
-        l_heel_x = data["LEFT_HEEL"][:, 0]
-        r_heel_x = data["RIGHT_HEEL"][:, 0]
-        l_toe_x = data["LEFT_FOOT_INDEX"][:, 0]
-        r_toe_x = data["RIGHT_FOOT_INDEX"][:, 0]
+    def detect_events(self, processed_data, plot_path: str = None, sequence_number: int = 1):
+        """
+        Detects gait events using the Desailly et al. method.
 
-        l_knee_x = data["LEFT_KNEE"][:, 0]
-        r_knee_x = data["RIGHT_KNEE"][:, 0]
+        Args:
+            processed_data (dict): A dictionary of processed keypoint data (numpy arrays).
+            plot_path (str, optional): Path to save debug plots. Defaults to None.
+            sequence_number (int, optional): Sequence identifier for file naming. Defaults to 1.
+
+        Returns:
+            tuple: Two lists (left_events, right_events) containing detected GaitEvent objects.
+        """
+        # Unpack pre-processed data
+        hip_x = processed_data["HIP"][:, 0]
+        l_heel_x = processed_data["LEFT_HEEL"][:, 0]
+        r_heel_x = processed_data["RIGHT_HEEL"][:, 0]
+        l_toe_x = processed_data["LEFT_FOOT_INDEX"][:, 0]
+        r_toe_x = processed_data["RIGHT_FOOT_INDEX"][:, 0]
+
+        l_knee_x = processed_data["LEFT_KNEE"][:, 0]
+        r_knee_x = processed_data["RIGHT_KNEE"][:, 0]
 
         # Determine direction
         overall_displacement = hip_x[-1] - hip_x[0]
@@ -37,6 +48,7 @@ class Desailly(BaseHeuristicDetector):
 
         # For debug plot
         k_max_sparse = []
+        peak_indices = []
         knee_signal = None
 
         if user_freq is not None:
@@ -113,59 +125,120 @@ class Desailly(BaseHeuristicDetector):
         left_events.sort(key=lambda x: x.frame)
         right_events.sort(key=lambda x: x.frame)
 
-        # --- DEBUG PLOT ---
-        # import matplotlib.pyplot as plt
-        # ax_offset = 0
-        #
-        # def get_plot_data(sparse_array):
-        #     if sparse_array is None or len(sparse_array) == 0:
-        #         return [], []
-        #     x_vals = [i for i, x in enumerate(sparse_array) if x is not None]
-        #     y_vals = [x for x in sparse_array if x is not None]
-        #     return x_vals, y_vals
-        #
-        # if knee_signal is not None:
-        #     fig, axs = plt.subplots(3, 1, figsize=(10, 10), sharex=True)
-        #     src = "User" if user_freq else ("Auto" if len(peak_indices) > 1 else "Fallback")
-        #     fig.suptitle(f"Desailly | Freq: {gait_freq:.2f} Hz | Source: {src}", fontsize=14)
-        #
-        #     # 1. Knee Signal
-        #     axs[0].set_title("1. Frequency Est: Knee Distance")
-        #     if knee_signal is not None:
-        #         axs[0].plot(knee_signal, color='gray', label="Raw")
-        #         kx, ky = get_plot_data(k_max_sparse)
-        #         if len(kx) > 0:
-        #             axs[0].scatter(kx, ky, c='purple', s=50, label="Cycle Peaks")
-        #     axs[0].legend()
-        #     axs[0].grid(True)
-        # else:
-        #     fig, axs = plt.subplots(2, 1, figsize=(10, 10), sharex=True)
-        #     ax_offset = 1
-        #
-        # # 2. HS Detection
-        # axs[1 - ax_offset].set_title(f"2. HS Detection: HP Heel")
-        # axs[1 - ax_offset].plot(hp_l_heel, label="L Heel HP", color='blue')
-        #
-        # target_sparse = l_heel_max if is_moving_right else l_heel_min
-        # hx, hy = get_plot_data(target_sparse)
-        # if len(hx) > 0:
-        #     axs[1 - ax_offset].scatter(hx, hy, c='red', marker='v', zorder=5, label="HS")
-        # axs[1 - ax_offset].legend()
-        # axs[1 - ax_offset].grid(True)
-        #
-        # # 3. TO Detection
-        # axs[2 - ax_offset].set_title(f"3. TO Detection: HP Toe")
-        # axs[2 - ax_offset].plot(hp_l_toe, label="L Toe HP", color='green')
-        #
-        # target_sparse = l_toe_min if is_moving_right else l_toe_max
-        # tx, ty = get_plot_data(target_sparse)
-        # if len(tx) > 0:
-        #     axs[2 - ax_offset].scatter(tx, ty, c='orange', marker='^', zorder=5, label="TO")
-        # axs[2 - ax_offset].legend()
-        # axs[2 - ax_offset].grid(True)
-        #
-        # plt.tight_layout()
-        # plt.show()
+        # --- DEBUG PLOT START ---
+        if plot_path is not None and self.save_debug_plot:
+            file_name = "desailly_clip_" + str(sequence_number) + ".png"
+            path = os.path.join(plot_path, file_name)
+
+            import matplotlib.pyplot as plt
+
+            # Helper for getting data from sparse array
+            def get_plot_data(sparse_array):
+                if sparse_array is None or len(sparse_array) == 0:
+                    return [], []
+                x_vals = [i for i, x in enumerate(sparse_array) if x is not None]
+                y_vals = [x for x in sparse_array if x is not None]
+                return x_vals, y_vals
+
+            # Cutoff frequency calculation
+            disp_fc_hs = hs_cutoff_factor * gait_freq
+            disp_fc_to = to_cutoff_factor * gait_freq
+
+            # Prepare grid
+            has_knee = (knee_signal is not None)
+            rows = 3 if has_knee else 2
+
+            fig = plt.figure(figsize=(14, 10))
+            gs = fig.add_gridspec(rows, 2)
+
+            src = "User" if user_freq else ("Auto" if len(peak_indices) > 1 else "Fallback")
+            fig.suptitle(
+                f"Desailly et al. | Walking Freq: {gait_freq:.2f} Hz ({src}) | Cutoffs: HS ~{disp_fc_hs:.2f}Hz, TO ~{disp_fc_to:.2f}Hz",
+                fontsize=14)
+
+            current_row = 0
+
+            # KNEE SIGNAL
+            if has_knee:
+                ax_knee = fig.add_subplot(gs[current_row, :])
+                ax_knee.set_title("Frequency Estimation: Knee Distance Signal")
+                ax_knee.set_ylabel('L knee to R knee distance (px)', color='gray')
+                ax_knee.set_xlabel('Frame Index')
+
+                ax_knee.plot(knee_signal, color='gray', alpha=0.7, label="Raw Knee Dist")
+
+                kx, ky = get_plot_data(k_max_sparse)
+                if len(kx) > 0:
+                    ax_knee.scatter(kx, ky, c='purple', s=50, zorder=5, label=f"Cycle Peaks (n={len(kx)})")
+
+                ax_knee.legend(loc='upper right')
+                ax_knee.grid(True, alpha=0.3)
+                current_row += 1
+
+            # HEEL X-COORD (HS Detection)
+            # Left Heel
+            ax_l_heel = fig.add_subplot(gs[current_row, 0])
+            ax_l_heel.set_title("Left Heel X-Coord (High-Pass)")
+            ax_l_heel.set_ylabel('Detrended Heel X (px)', color='blue')
+            ax_l_heel.set_xlabel('Frame Index')
+            ax_l_heel.plot(hp_l_heel, label="Left Heel", color='blue')
+
+            target_l = l_heel_max if is_moving_right else l_heel_min
+            hx, hy = get_plot_data(target_l)
+            if len(hx) > 0:
+                ax_l_heel.scatter(hx, hy, c='red', marker='v', s=80, zorder=5, edgecolors='black', label="HS Event")
+            ax_l_heel.grid(True, alpha=0.3)
+            ax_l_heel.legend(loc='upper right')
+
+            # Right Heel
+            ax_r_heel = fig.add_subplot(gs[current_row, 1], sharex=ax_l_heel)
+            ax_r_heel.set_title("Right Heel X-Coord (High-Pass)")
+            ax_r_heel.set_ylabel('Detrended Heel X (px)', color='blue')
+            ax_r_heel.set_xlabel('Frame Index')
+            ax_r_heel.plot(hp_r_heel, label="Right heel", color='blue')
+
+            target_r = r_heel_max if is_moving_right else r_heel_min
+            rhx, rhy = get_plot_data(target_r)
+            if len(rhx) > 0:
+                ax_r_heel.scatter(rhx, rhy, c='red', marker='v', s=80, zorder=5, edgecolors='black', label="HS Event")
+            ax_r_heel.grid(True, alpha=0.3)
+            ax_r_heel.legend(loc='upper right')
+
+            current_row += 1
+
+            # TOE X-COORD (TO Detection)
+            # Left Toe
+            ax_l_toe = fig.add_subplot(gs[current_row, 0], sharex=ax_l_heel)
+            ax_l_toe.set_title("Left Toe X-Coord (High-Pass)")
+            ax_l_toe.set_ylabel('Detrended Toe X (px)', color='green')
+            ax_l_toe.set_xlabel('Frame Index')
+            ax_l_toe.plot(hp_l_toe, label="Left toe", color='green')
+
+            target_l_to = l_toe_min if is_moving_right else l_toe_max
+            tx, ty = get_plot_data(target_l_to)
+            if len(tx) > 0:
+                ax_l_toe.scatter(tx, ty, c='orange', marker='^', s=80, zorder=5, edgecolors='black', label="TO Event")
+            ax_l_toe.grid(True, alpha=0.3)
+            ax_l_toe.legend(loc='upper right')
+
+            # Right Toe
+            ax_r_toe = fig.add_subplot(gs[current_row, 1], sharex=ax_l_heel)
+            ax_r_toe.set_title("Right Toe X-Coord (High-Pass)")
+            ax_r_toe.set_ylabel('Detrended Toe X (px)', color='green')
+            ax_r_toe.set_xlabel('Frame Index')
+            ax_r_toe.plot(hp_r_toe, label="Right Toe", color='green')
+
+            target_r_to = r_toe_min if is_moving_right else r_toe_max
+            rtx, rty = get_plot_data(target_r_to)
+            if len(rtx) > 0:
+                ax_r_toe.scatter(rtx, rty, c='orange', marker='^', s=80, zorder=5, edgecolors='black', label="TO Event")
+            ax_r_toe.grid(True, alpha=0.3)
+            ax_r_toe.legend(loc='upper right')
+
+            plt.tight_layout()
+            plt.savefig(path, dpi=150)
+            plt.close()
+            print(f"[Output] Plot saved to: {path}")
         # --- DEBUG PLOT END ---
 
         return left_events, right_events

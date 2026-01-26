@@ -16,13 +16,24 @@ class Hreljac(BaseHeuristicDetector):
     def get_required_keypoints(self):
         return ["HIP", "LEFT_FOOT_INDEX", "RIGHT_FOOT_INDEX", "LEFT_HEEL", "RIGHT_HEEL"]
 
-    def detect_events(self, data):
+    def detect_events(self, processed_data, plot_path: str = None, sequence_number: int = 1):
+        """
+        Detects gait events using the Hreljac et al. method.
+
+        Args:
+            processed_data (dict): A dictionary of processed keypoint data (numpy arrays).
+            plot_path (str, optional): Path to save debug plots. Defaults to None.
+            sequence_number (int, optional): Sequence identifier for file naming. Defaults to 1.
+
+        Returns:
+            tuple: Two lists (left_events, right_events) containing detected GaitEvent objects.
+        """
         # Unpack pre-processed data from the base class
-        hip_x = data["HIP"][:, 0]
-        raw_l_heel_y = data["LEFT_HEEL"][:, 1]
-        raw_r_heel_y = data["RIGHT_HEEL"][:, 1]
-        raw_l_toe_x = data["LEFT_FOOT_INDEX"][:, 0]
-        raw_r_toe_x = data["RIGHT_FOOT_INDEX"][:, 0]
+        hip_x = processed_data["HIP"][:, 0]
+        raw_l_heel_y = processed_data["LEFT_HEEL"][:, 1]
+        raw_r_heel_y = processed_data["RIGHT_HEEL"][:, 1]
+        raw_l_toe_x = processed_data["LEFT_FOOT_INDEX"][:, 0]
+        raw_r_toe_x = processed_data["RIGHT_FOOT_INDEX"][:, 0]
 
         # --- Algorithm Params ---
         acc_cutoff = self.algorithm_params.get("accel_filter_cutoff", 6.0)
@@ -101,53 +112,68 @@ class Hreljac(BaseHeuristicDetector):
         right_events.sort(key=lambda x: x.frame)
 
         # --- DEBUG PLOT START ---
-        # import matplotlib.pyplot as plt
-        #
-        # fig, axs = plt.subplots(2, 2, figsize=(14, 8), sharex=True)
-        # fig.suptitle(f"Hreljac Debug | Moving Right: {is_moving_right} | Cutoff: {acc_cutoff}Hz", fontsize=14)
-        #
-        # --- HEEL VERTICAL ACCELERATION (HS) ---
-        # # Left Heel
-        # axs[0, 0].set_title("Left Heel Vertical Accel (Target: HS = Min)")
-        # axs[0, 0].plot(l_acc_y, color='#2980b9', alpha=0.8, label='Accel Y')
-        # axs[0, 0].plot(lhy_min, "v", color='red', markersize=10, label='HS Candidate')  # HS is always Min (Impact)
-        # axs[0, 0].grid(True, alpha=0.3)
-        # axs[0, 0].legend(loc='upper right')
-        #
-        # # Right Heel
-        # axs[0, 1].set_title("Right Heel Vertical Accel (Target: HS = Min)")
-        # axs[0, 1].plot(r_acc_y, color='#2980b9', alpha=0.8, label='Accel Y')
-        # axs[0, 1].plot(rhy_min, "v", color='red', markersize=10, label='HS Candidate')
-        # axs[0, 1].grid(True, alpha=0.3)
-        # axs[0, 1].legend(loc='upper right')
-        #
-        # # --- TOE HORIZONTAL ACCELERATION (TO) ---
-        # # Logic depends on direction
-        # to_marker = "^" if is_moving_right else "v"
-        # to_label = "Max" if is_moving_right else "Min"
-        #
-        # # Left Toe
-        # axs[1, 0].set_title(f"Left Toe Horizontal Accel (Target: TO = {to_label})")
-        # axs[1, 0].plot(l_acc_x, color='#27ae60', alpha=0.8, label='Accel X')
-        # if is_moving_right:
-        #     axs[1, 0].plot(ltx_max, to_marker, color='red', markersize=10, label='TO Candidate')
-        # else:
-        #     axs[1, 0].plot(ltx_min, to_marker, color='red', markersize=10, label='TO Candidate')
-        # axs[1, 0].grid(True, alpha=0.3)
-        # axs[1, 0].legend(loc='upper right')
-        #
-        # # Right Toe
-        # axs[1, 1].set_title(f"Right Toe Horizontal Accel (Target: TO = {to_label})")
-        # axs[1, 1].plot(r_acc_x, color='#27ae60', alpha=0.8, label='Accel X')
-        # if is_moving_right:
-        #     axs[1, 1].plot(rtx_max, to_marker, color='red', markersize=10, label='TO Candidate')
-        # else:
-        #     axs[1, 1].plot(rtx_min, to_marker, color='red', markersize=10, label='TO Candidate')
-        # axs[1, 1].grid(True, alpha=0.3)
-        # axs[1, 1].legend(loc='upper right')
-        #
-        # plt.tight_layout()
-        # plt.show()
+        if plot_path is not None and self.save_debug_plot:
+            file_name = "hreljac_clip_" + str(sequence_number) + ".png"
+            path = os.path.join(plot_path, file_name)
+
+            import matplotlib.pyplot as plt
+
+            fig, axs = plt.subplots(2, 2, figsize=(14, 10), sharex=True)
+            fig.suptitle(f"Hreljac et al. | Moving Right: {is_moving_right} | Cutoff: {acc_cutoff}Hz", fontsize=14)
+
+            def plot_hreljac_leg(ax, acc_signal, pos_signal, peaks, title, acc_color, pos_color, peak_type):
+                # Left axis - Acceleration
+                ax.set_title(title)
+                ax.set_ylabel('Acceleration ($px/s^2$)', color=acc_color)
+                ax.set_xlabel('Frame Index')
+                line1, = ax.plot(acc_signal, color=acc_color, alpha=0.9, linewidth=1.5, label='Acceleration')
+
+                px = [i for i, x in enumerate(peaks) if x is not None]
+                py = [x for x in peaks if x is not None]
+
+                marker = "v" if peak_type == "min" else "^"
+                color = "red" if peak_type == "min" else "orange"
+                scatter = None
+                if len(px) > 0:
+                    scatter = ax.scatter(px, py, c=color, marker=marker, s=80, zorder=5, edgecolors='black',
+                                         label='Event Candidate')
+
+                ax.grid(True, alpha=0.3)
+
+                # Right axis - Position
+                ax2 = ax.twinx()
+                ax2.set_ylabel('Position (px)', color='gray', alpha=0.8)
+                line2, = ax2.plot(pos_signal, color=pos_color, alpha=0.3, linestyle='--', label='Position Trace')
+
+                handles = [line1, line2]
+                if scatter:
+                    handles.append(scatter)
+
+                labels = [h.get_label() for h in handles]
+                ax.legend(handles, labels, loc='upper left')
+
+            # --- HEEL STRIKE (Vertical) ---
+            plot_hreljac_leg(axs[0, 0], l_acc_y, raw_l_heel_y, lhy_min,
+                             "Left Heel: Vertical Accel (HS)", 'blue', 'gray', "min")
+
+            plot_hreljac_leg(axs[0, 1], r_acc_y, raw_r_heel_y, rhy_min,
+                             "Right Heel: Vertical Accel (HS)", 'blue', 'gray', "min")
+
+            # --- TOE OFF (Horizontal) ---
+            to_peak_type = "max" if is_moving_right else "min"
+            l_target = ltx_max if is_moving_right else ltx_min
+            r_target = rtx_max if is_moving_right else rtx_min
+
+            plot_hreljac_leg(axs[1, 0], l_acc_x, raw_l_toe_x, l_target,
+                             "Left Toe: Horiz Accel (TO)", 'green', 'gray', to_peak_type)
+
+            plot_hreljac_leg(axs[1, 1], r_acc_x, raw_r_toe_x, r_target,
+                             "Right Toe: Horiz Accel (TO)", 'green', 'gray', to_peak_type)
+
+            plt.tight_layout()
+            plt.savefig(path, dpi=150)
+            plt.close()
+            print(f"[Output] Plot saved to: {path}")
         # --- DEBUG PLOT END ---
 
         return left_events, right_events

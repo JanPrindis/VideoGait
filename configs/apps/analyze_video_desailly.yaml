@@ -54,6 +54,8 @@ event_detector:
 # Visualization (placeholder)
 visualization:
   output_type: "pdf" # pdf / md / console
+  event_detector_debug_plots: true  # Save debug plots of gait event detector (for validation, or fine-tuning)
+
   events_color_map:
     L_HS: [255, 0, 0]
     R_HS: [0, 0, 255]

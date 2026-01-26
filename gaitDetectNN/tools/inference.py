@@ -146,57 +146,75 @@ def visualize_results(predictions, events, cfg, save_path):
     nn_cfg = cfg['event_detector'].get('neural_net', {})
     post_proc = nn_cfg.get('post_processing', {})
     threshold = post_proc.get('threshold', 0.5)
+    experiment_name = nn_cfg.get("experiment_path", "/Unknown").split("/")[-1]
 
     num_classes = predictions.shape[1]
-    fig, axs = plt.subplots(num_classes, 1, figsize=(12, 12), sharex=True)
+    fig, axs = plt.subplots(num_classes, 1, figsize=(12, 14), sharex=True)
     if num_classes == 1: axs = [axs]
 
-    # Event to plot mapping
-    plot_mapping = {
-        0: ("left", GaitEventType.HEEL_STRIKE),
-        1: ("left", GaitEventType.TOE_OFF),
-        2: ("right", GaitEventType.HEEL_STRIKE),
-        3: ("right", GaitEventType.TOE_OFF)
+    # Color Palette
+    COL_HS_SIG = 'blue'
+    COL_TO_SIG = 'green'
+    COL_HS_MARKER = 'red'
+    COL_TO_MARKER = 'orange'
+
+    # Mapping index -> (Side, Type, Title, ColorSignal, ColorMarker, MarkerShape)
+    layer_config = {
+        0: ("left", GaitEventType.HEEL_STRIKE, "Left Heel Strike", COL_HS_SIG, COL_HS_MARKER, 'v'),
+        1: ("left", GaitEventType.TOE_OFF, "Left Toe Off", COL_TO_SIG, COL_TO_MARKER, '^'),
+        2: ("right", GaitEventType.HEEL_STRIKE, "Right Heel Strike", COL_HS_SIG, COL_HS_MARKER, 'v'),
+        3: ("right", GaitEventType.TOE_OFF, "Right Toe Off", COL_TO_SIG, COL_TO_MARKER, '^')
     }
 
     for i in range(num_classes):
-        # Confidence line
-        axs[i].plot(predictions[:, i], label='Probability', color='blue', linewidth=1.5)
+        ax = axs[i]
+        side, ev_type, title, col_sig, col_marker, marker_shape = layer_config[i]
 
-        # Confidence threshold
-        axs[i].axhline(y=threshold, color='red', linestyle='--', linewidth=1.5, alpha=0.7,
-                       label=f'Threshold ({threshold})')
+        signal = predictions[:, i]
 
-        # Axis config
-        axs[i].set_ylabel(EVENT_ORDER[i])
-        axs[i].set_ylim(-0.1, 1.2)
-        axs[i].grid(True, alpha=0.3)
+        # Probability curve
+        ax.plot(signal, label='Confidence', color=col_sig, linewidth=2)
+        ax.fill_between(range(len(signal)), signal, 0, color=col_sig, alpha=0.2)
+
+        # Threshold line
+        ax.axhline(y=threshold, color='gray', linestyle='--', linewidth=1, alpha=0.8,
+                   label=f'Threshold ({threshold})')
 
         # Detected events
-        side, ev_type = plot_mapping[i]
         relevant_events = [e for e in events[side] if e.event_type == ev_type]
 
         if relevant_events:
             frames = [e.frame for e in relevant_events]
-            values = predictions[frames, i]
+            values = signal[frames]
 
-            # Dot
-            axs[i].scatter(frames, values, color='lime', edgecolors='black', s=50, zorder=5, label='Detected Peak')
+            # Scatter Marker
+            ax.scatter(frames, values, c=col_marker, marker=marker_shape,
+                       s=100, zorder=10, edgecolors='black', label='Detected Event')
 
-            # Event frame number
+            # Text Labels
             for f, v in zip(frames, values):
-                axs[i].text(f, v + 0.08, str(f), fontsize=9, ha='center', va='bottom', fontweight='bold',
-                            color='darkgreen')
+                ax.text(f, v + 0.05, str(f), fontsize=10, ha='center', va='bottom',
+                        fontweight='bold', color='black', zorder=11)
 
-        if i == 0:
-            axs[i].legend(loc='lower right')
+        # Styling
+        ax.set_title(title, fontsize=12, fontweight='bold', loc='left')
+        ax.set_ylim(-0.05, 1.15)
+        ax.set_yticks([0, 0.5, 1.0])
+        ax.grid(True, axis='y', linestyle=':', alpha=0.5)
 
-    plt.xlabel("Frame Index")
-    plt.suptitle("Gait Event Detection")
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
+        # Legend (only first HS and TO)
+        if i == 0 or i == 1:
+            ax.legend(loc='lower left', frameon=True, framealpha=0.9)
+
+    plt.xlabel("Frame Index", fontsize=12)
+    plt.suptitle(f"Neural Network Gait Event Detection - {experiment_name}", fontsize=16, y=0.99)
     plt.tight_layout()
-    plt.savefig(save_path)
-    print(f"[Output] Plot saved to: {save_path}")
+    plt.savefig(save_path, dpi=150)
     plt.close(fig)
+    print(f"[Output] Plot saved to: {save_path}")
 
 
 def run_nn_inference(
@@ -352,14 +370,26 @@ def run_nn_inference(
     )
 
     # Save output
-    if output_dir:
+    visualization_config = cfg.get("visualization", {})
+    save_debug_plot = visualization_config.get("event_detector_debug_plots", False)
+
+    if output_dir and save_debug_plot:
         if not os.path.isabs(output_dir):
             output_dir = os.path.join(PROJECT_ROOT, output_dir)
-        os.makedirs(output_dir, exist_ok=True)
+
+        # Create output folder
+        debug_dir = os.path.join(output_dir, "event_detector_debug")
+
+        # If debug folder exists, remove
+        if os.path.exists(debug_dir):
+            shutil.rmtree(debug_dir)
+
+        # Create clean debug dir (does not contain old files)
+        os.makedirs(debug_dir, exist_ok=True)
 
         # Save the prediction plot
-        plot_path = os.path.join(output_dir, "gait_confidences_plot.png")
-        visualize_results(full_prediction, structured_events, cfg, plot_path)
+        plot_path = os.path.join(debug_dir, "gait_confidences_plot.png")
+        visualize_confidences(full_prediction, structured_events, cfg, plot_path)
 
     return {
         "predictions": full_prediction,
@@ -372,11 +402,10 @@ def run_nn_inference(
 
 if __name__ == "__main__":
     config = "configs/apps/analyze_video.yaml"
-    # input_path = "results/test.json"
     input_path = "dataset/PROCESSED/60/KEYPOINTS/PD_006_MD.json"
-    output_dir = "results/test_patient"
+    output_dir = "results/test_patient_lstm"
 
-    data = run_inference_pipeline(config, input_path, output_dir)
+    data = run_nn_inference(config, input_path, output_dir)
     print("Test")
 
     from gaitStructs import build_phases_from_events

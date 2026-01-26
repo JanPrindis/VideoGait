@@ -15,12 +15,23 @@ class Ghoussayni(BaseHeuristicDetector):
     def get_required_keypoints(self):
         return ["LEFT_FOOT_INDEX", "RIGHT_FOOT_INDEX", "LEFT_HEEL", "RIGHT_HEEL"]
 
-    def detect_events(self, data):
+    def detect_events(self, processed_data, plot_path: str = None, sequence_number: int = 1):
+        """
+        Detects gait events using the Ghoussayni et al. method.
+
+        Args:
+            processed_data (dict): A dictionary of processed keypoint data (numpy arrays).
+            plot_path (str, optional): Path to save debug plots. Defaults to None.
+            sequence_number (int, optional): Sequence identifier for file naming. Defaults to 1.
+
+        Returns:
+            tuple: Two lists (left_events, right_events) containing detected GaitEvent objects.
+        """
         # Unpack data
-        l_toe = data["LEFT_FOOT_INDEX"]
-        r_toe = data["RIGHT_FOOT_INDEX"]
-        l_heel = data["LEFT_HEEL"]
-        r_heel = data["RIGHT_HEEL"]
+        l_toe = processed_data["LEFT_FOOT_INDEX"]
+        r_toe = processed_data["RIGHT_FOOT_INDEX"]
+        l_heel = processed_data["LEFT_HEEL"]
+        r_heel = processed_data["RIGHT_HEEL"]
 
         # --- Algorithm Params ---
         # Option 1: Fixed threshold (in case we have calibrated data in cm/s)
@@ -91,5 +102,86 @@ class Ghoussayni(BaseHeuristicDetector):
         # Sort and return values
         left_events.sort(key=lambda x: x.frame)
         right_events.sort(key=lambda x: x.frame)
+
+        # --- DEBUG PLOT START ---
+        if plot_path is not None and self.save_debug_plot:
+            file_name = "ghoussayni_clip_" + str(sequence_number) + ".png"
+            path = os.path.join(plot_path, file_name)
+
+            import matplotlib.pyplot as plt
+
+            l_h_th = get_thresh(l_heel_vel)
+            l_t_th = get_thresh(l_toe_vel)
+            r_h_th = get_thresh(r_heel_vel)
+            r_t_th = get_thresh(r_toe_vel)
+
+            fig, axs = plt.subplots(2, 2, figsize=(14, 10), sharex=True)
+            fig.suptitle(f"Ghoussayni et al. | Ratio: {rel_threshold}", fontsize=14)
+
+            # --- LEFT LEG ---
+            # Left Heel (HS Detection)
+            axs[0, 0].set_title(f"Left Heel Velocity (HS Logic) | Thresh: {l_h_th:.1f}")
+            axs[0, 0].set_ylabel('Heel Velocity (px/s)', color='blue')
+            axs[0, 0].set_xlabel('Frame Index')
+            axs[0, 0].plot(l_heel_vel, color='blue', label="Heel Velocity")
+            axs[0, 0].axhline(y=l_h_th, color='red', linestyle='--', alpha=0.7, label="Threshold (Falling)")
+
+            for e in left_events:
+                if e.event_type == GaitEventType.HEEL_STRIKE:
+                    axs[0, 0].scatter(e.frame, l_heel_vel[e.frame], c='red', marker='v', s=80, zorder=5, edgecolors='black')
+
+            axs[0, 0].legend(loc='upper right')
+            axs[0, 0].grid(True, alpha=0.3)
+
+            # Left Toe (TO Detection)
+            axs[0, 1].set_title(f"Left Toe Velocity (TO Logic) | Thresh: {l_t_th:.1f}")
+            axs[0, 1].set_ylabel('Toe Velocity (px/s)', color='green')
+            axs[0, 1].set_xlabel('Frame Index')
+            axs[0, 1].plot(l_toe_vel, color='green', label="Toe Velocity")
+            axs[0, 1].axhline(y=l_t_th, color='orange', linestyle='--', alpha=0.7, label="Threshold (Rising)")
+
+            for e in left_events:
+                if e.event_type == GaitEventType.TOE_OFF:
+                    axs[0, 1].scatter(e.frame, l_toe_vel[e.frame], c='orange', marker='^', s=80, zorder=5,
+                                      edgecolors='black')
+
+            axs[0, 1].legend(loc='upper right')
+            axs[0, 1].grid(True, alpha=0.3)
+
+            # --- RIGHT LEG ---
+            # Right Heel (HS Detection)
+            axs[1, 0].set_title(f"Right Heel Velocity (HS Logic) | Thresh: {r_h_th:.1f}")
+            axs[1, 0].set_ylabel('Heel Velocity (px/s)', color='blue')
+            axs[1, 0].set_xlabel('Frame Index')
+            axs[1, 0].plot(r_heel_vel, color='blue', label="Heel Velocity")
+            axs[1, 0].axhline(y=r_h_th, color='red', linestyle='--', alpha=0.7, label="Threshold (Falling)")
+
+            for e in right_events:
+                if e.event_type == GaitEventType.HEEL_STRIKE:
+                    axs[1, 0].scatter(e.frame, r_heel_vel[e.frame], c='red', marker='v', s=80, zorder=5, edgecolors='black')
+
+            axs[1, 0].legend(loc='upper right')
+            axs[1, 0].grid(True, alpha=0.3)
+
+            # Right Toe (TO Detection)
+            axs[1, 1].set_title(f"Right Toe Velocity (TO Logic) | Thresh: {r_t_th:.1f}")
+            axs[1, 1].set_ylabel('Toe Velocity (px/s)', color='green')
+            axs[1, 1].set_xlabel('Frame Index')
+            axs[1, 1].plot(r_toe_vel, color='green', label="Toe Velocity")
+            axs[1, 1].axhline(y=r_t_th, color='orange', linestyle='--', alpha=0.7, label="Threshold (Rising)")
+
+            for e in right_events:
+                if e.event_type == GaitEventType.TOE_OFF:
+                    axs[1, 1].scatter(e.frame, r_toe_vel[e.frame], c='orange', marker='^', s=80, zorder=5,
+                                      edgecolors='black')
+
+            axs[1, 1].legend(loc='upper right')
+            axs[1, 1].grid(True, alpha=0.3)
+
+            plt.tight_layout()
+            plt.savefig(path, dpi=150)
+            plt.close()
+            print(f"[Output] Plot saved to: {path}")
+        # --- DEBUG PLOT END ---
 
         return left_events, right_events

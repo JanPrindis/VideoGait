@@ -158,7 +158,20 @@ class BaseHeuristicDetector(ABC):
     def get_required_keypoints(self):
         pass
 
-    def run_inference(self, json_path):
+    def run_inference(self, json_path: str, output_dir: str = None):
+        """
+        Executes the full inference pipeline on a keypoint JSON file.
+
+        It handles data loading, segmentation, event detection for each segment,
+        and aggregation of results.
+
+        Args:
+            json_path (str): Path to the input keypoints JSON file.
+            output_dir (str, optional): Directory to save debug outputs.
+
+        Returns:
+            dict: Dictionary containing detected events, global ranges, and framerate.
+        """
         # Get hip data and valid ranges
         hip_data, valid_ranges, is_virtual_hip, global_offset = self._prepare_hip_and_ranges(json_path)
 
@@ -169,13 +182,24 @@ class BaseHeuristicDetector(ABC):
                 "framerate": self.framerate
             }
 
+        # Create output folder
+        if output_dir is not None and self.save_debug_plot:
+            debug_dir = os.path.join(output_dir, "event_detector_debug")
+
+            # If debug folder exists, remove
+            if os.path.exists(debug_dir):
+                shutil.rmtree(debug_dir)
+
+            # Create clean debug dir (does not contain old files)
+            os.makedirs(debug_dir, exist_ok=True)
+
         req_kps = self.get_required_keypoints()
         all_left_events = []
         all_right_events = []
         final_global_ranges = []
 
         # Iterate each segment separately
-        for start, end in valid_ranges:
+        for i, (start, end) in enumerate(valid_ranges):
             segment_data = self._extract_segment_data(json_path, start, end, req_kps, hip_data, is_virtual_hip)
 
             # If data is missing - skip
@@ -183,7 +207,12 @@ class BaseHeuristicDetector(ABC):
                 continue
 
             # Event detection
-            l_ev, r_ev = self.detect_events(segment_data)
+            plot_path = os.path.join(output_dir, "event_detector_debug") if output_dir else None
+            l_ev, r_ev = self.detect_events(
+                processed_data=segment_data,
+                plot_path=plot_path,
+                sequence_number=i
+            )
 
             # Offset calculation
             current_shift = start + global_offset

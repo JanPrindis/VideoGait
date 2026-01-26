@@ -50,6 +50,9 @@ def run_heuristic_inference(
     if not os.path.isabs(input_path):
         input_path = os.path.join(PROJECT_ROOT, input_path)
 
+    if output_dir is not None and not os.path.isabs(output_dir):
+        output_dir = os.path.join(PROJECT_ROOT, output_dir)
+
     # Safety Check
     method = cfg.get('event_detector', {}).get('method')
     if method != 'Heuristic':
@@ -66,7 +69,7 @@ def run_heuristic_inference(
     # Run Inference
     # The detector handles data loading, preprocessing, and range looping internally
     print(f"[Inference] Processing {os.path.basename(input_path)}...")
-    result = detector.run_inference(input_path)
+    result = detector.run_inference(input_path, output_dir)
 
     events = result['events']
     ranges = result['global_ranges']
@@ -89,22 +92,27 @@ def run_heuristic_inference(
 
 
 if __name__ == "__main__":
-    config = "configs/apps/analyze_video_zeni.yaml"
-    # input_path = "results/test.json"
-    input_path = "dataset/PROCESSED/60/KEYPOINTS/KOA_003_SV.json"
-    output_dir = "results/test_patient_heuristic"
+    methods = ["bonci", "desailly", "ghoussayni", "hreljac", "hsue", "oconnor", "zeni"]
+    visualize = False
 
-    data = run_heuristic_inference(config, input_path, output_dir)
-    print("Test")
+    for method in methods:
+        config = f"configs/apps/analyze_video_{method}.yaml"
 
-    from gaitStructs import build_phases_from_events
-    from visualizeGaitPhases import visualize_gait_phases, print_statistics
+        input_path = "dataset/PROCESSED/60/KEYPOINTS/KOA_003_SV.json"
+        output_dir = f"results/test_patient_{method}"
 
-    l_phases, r_phases, support_phases = build_phases_from_events(
-        data["events"],
-        data["global_ranges"]
-    )
+        data = run_heuristic_inference(config, input_path, output_dir)
+        print(f"Testing done: {method}")
 
-    print_statistics(l_phases, r_phases, support_phases)
-    visualize_gait_phases(l_phases, r_phases, support_phases)
+        if visualize:
+            from gaitStructs import build_phases_from_events
+            from visualizeGaitPhases import visualize_gait_phases, print_statistics
+
+            l_phases, r_phases, support_phases = build_phases_from_events(
+                data["events"],
+                data["global_ranges"]
+            )
+
+            print_statistics(l_phases, r_phases, support_phases)
+            visualize_gait_phases(l_phases, r_phases, support_phases)
 

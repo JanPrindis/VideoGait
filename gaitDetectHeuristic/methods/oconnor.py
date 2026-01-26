@@ -19,12 +19,23 @@ class OConnor(BaseHeuristicDetector):
     def get_required_keypoints(self):
         return ["LEFT_FOOT_INDEX", "RIGHT_FOOT_INDEX", "LEFT_HEEL", "RIGHT_HEEL"]
 
-    def detect_events(self, data):
+    def detect_events(self, processed_data, plot_path: str = None, sequence_number: int = 1):
+        """
+        Detects gait events using the O'Connor et al. method.
+
+        Args:
+            processed_data (dict): A dictionary of processed keypoint data (numpy arrays).
+            plot_path (str, optional): Path to save debug plots. Defaults to None.
+            sequence_number (int, optional): Sequence identifier for file naming. Defaults to 1.
+
+        Returns:
+            tuple: Two lists (left_events, right_events) containing detected GaitEvent objects.
+        """
         # Unpack pre-processed data from the base class (Vertical Y only)
-        l_heel_y = data["LEFT_HEEL"][:, 1]
-        r_heel_y = data["RIGHT_HEEL"][:, 1]
-        l_toe_y = data["LEFT_FOOT_INDEX"][:, 1]
-        r_toe_y = data["RIGHT_FOOT_INDEX"][:, 1]
+        l_heel_y = processed_data["LEFT_HEEL"][:, 1]
+        r_heel_y = processed_data["RIGHT_HEEL"][:, 1]
+        l_toe_y = processed_data["LEFT_FOOT_INDEX"][:, 1]
+        r_toe_y = processed_data["RIGHT_FOOT_INDEX"][:, 1]
 
         # --- Algorithm Params ---
         vel_cutoff = self.algorithm_params.get("velocity_filter_cutoff", 5.0)
@@ -100,23 +111,75 @@ class OConnor(BaseHeuristicDetector):
         left_events.sort(key=lambda x: x.frame)
         right_events.sort(key=lambda x: x.frame)
 
-        # # --- DEBUG PLOT START (Optional) ---
-        # import matplotlib.pyplot as plt
-        # fig, ax = plt.subplots(2, 1, figsize=(10, 8), sharex=True)
-        # ax[0].set_title("Left Foot Midpoint Vertical Velocity")
-        # ax[0].plot(l_mid_vel, label="Vel Y")
-        # ax[0].plot(l_max, "v", color="red", label="HS (Max - Descent)")
-        # ax[0].plot(l_min, "^", color="green", label="TO (Min - Ascent)")
-        # ax[0].legend()
-        # ax[0].grid(True)
-        #
-        # ax[1].set_title("Right Foot Midpoint Vertical Velocity")
-        # ax[1].plot(r_mid_vel, label="Vel Y")
-        # ax[1].plot(r_max, "v", color="red", label="HS (Max - Descent)")
-        # ax[1].plot(r_min, "^", color="green", label="TO (Min - Ascent)")
-        # ax[1].legend()
-        # ax[1].grid(True)
-        # plt.show()
+        # --- DEBUG PLOT START ---
+        if plot_path is not None and self.save_debug_plot:
+            file_name = "oconnor_clip_" + str(sequence_number) + ".png"
+            path = os.path.join(plot_path, file_name)
+
+            import matplotlib.pyplot as plt
+
+            # Calculate the midpoint positions again
+            l_mid_pos = (l_heel_y + l_toe_y) / 2.0
+            r_mid_pos = (r_heel_y + r_toe_y) / 2.0
+
+            used_prom_l = prom_l if isinstance(prom_l, float) else np.mean(prom_l) if prom_l is not None else 0
+
+            fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
+            fig.suptitle(f"O'Connor et al. | Cutoff: {vel_cutoff}Hz | Prom: ~{used_prom_l:.2f}",
+                         fontsize=14)
+
+            def plot_oconnor_leg(ax, vel_signal, pos_signal, hs_peaks, to_peaks, title):
+                # Left axis - velocity
+                ax.set_title(title)
+                ax.set_xlabel('Frame Index')
+                ax.set_ylabel('Vert. Velocity (px/s)', color='#8e44ad')
+                line1, = ax.plot(vel_signal, color='#8e44ad', alpha=0.9, linewidth=1.5, label='Midpoint Velocity')
+
+                # HS (Max Descent -> Peak in our data because Y is down)
+                px_hs = [i for i, x in enumerate(hs_peaks) if x is not None]
+                py_hs = [x for x in hs_peaks if x is not None]
+
+                scatter_hs = None
+                if len(px_hs) > 0:
+                    scatter_hs = ax.scatter(px_hs, py_hs, c='red', marker='v', s=80, zorder=5, edgecolors='black',
+                                            label='HS Candidate (Max Vel)')
+
+                # TO (Max Ascent -> Min in our data because Y is down)
+                px_to = [i for i, x in enumerate(to_peaks) if x is not None]
+                py_to = [x for x in to_peaks if x is not None]
+
+                scatter_to = None
+                if len(px_to) > 0:
+                    scatter_to = ax.scatter(px_to, py_to, c='orange', marker='^', s=80, zorder=5, edgecolors='black',
+                                            label='TO Candidate (Min Vel)')
+
+                ax.grid(True, alpha=0.3)
+
+                # Right axis - Y Position
+                ax2 = ax.twinx()
+                ax2.set_ylabel('Position Y (px)', color='gray', alpha=0.8)
+                line2, = ax2.plot(pos_signal, color='gray', alpha=0.3, linestyle='--', label='Position Y Trace')
+
+                # Legend
+                handles = [line1, line2]
+                if scatter_hs: handles.append(scatter_hs)
+                if scatter_to: handles.append(scatter_to)
+                labels = [h.get_label() for h in handles]
+
+                ax.legend(handles, labels, loc='upper right')
+
+            # LEFT LEG
+            plot_oconnor_leg(axs[0], l_mid_vel, l_mid_pos, l_max, l_min,
+                             "Left Leg: Midpoint Vertical Dynamics")
+
+            # RIGHT LEG
+            plot_oconnor_leg(axs[1], r_mid_vel, r_mid_pos, r_max, r_min,
+                             "Right Leg: Midpoint Vertical Dynamics")
+
+            plt.tight_layout()
+            plt.savefig(path, dpi=150)
+            plt.close()
+            print(f"[Output] Plot saved to: {path}")
         # --- DEBUG PLOT END ---
 
         return left_events, right_events
