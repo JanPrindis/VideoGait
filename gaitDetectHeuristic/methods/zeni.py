@@ -1,13 +1,21 @@
+import os
+
 import numpy as np
 from ..utils.registry import HEURISTICS
 from ..base import BaseHeuristicDetector
 from gaitStructs import GaitEvent, GaitEventType
 from utils.data import find_minima_maxima
 
+
 @HEURISTICS.register
 class Zeni(BaseHeuristicDetector):
     """
-    Implementation of the Zeni et al. method
+    Implementation of Zeni et al. (2008).
+    Also known as the "Coordinate Based Algorithm" (CBA). Based on the relative distance to the sacrum/pelvis.
+
+    Detection Logic:
+    - HS: Maximum anterior distance between Heel and Hip (Heel furthest forward).
+    - TO: Maximum posterior distance between Toe and Hip (Toe furthest back).
     """
 
     def get_required_keypoints(self):

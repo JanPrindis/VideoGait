@@ -1,3 +1,4 @@
+import shutil
 from typing import Union, Dict, Any, List
 
 import yaml
@@ -130,7 +131,7 @@ def extract_gait_events(
     return events
 
 
-def visualize_results(predictions, events, cfg, save_path):
+def visualize_confidences(predictions, events, cfg, save_path):
     """
     Generates and saves a plot visualizing the model's confidence scores and detected events.
 
@@ -224,14 +225,6 @@ def run_nn_inference(
 ):
     """
     Executes the full gait analysis inference pipeline.
-
-    This includes:
-    1. Loading application and training configurations.
-    2. Preprocessing input keypoint data (normalization, feature extraction).
-    3. Loading the trained neural network model.
-    4. Running predictions on the processed data.
-    5. Post-processing predictions to extract discrete gait events.
-    6. Visualizing and saving the prediction results for debug use.
 
     Args:
         app_config (Union[str, Dict[str, Any]]): Path to the app config YAML or the loaded dict.

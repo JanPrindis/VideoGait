@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 from ..utils.registry import HEURISTICS
 from ..base import BaseHeuristicDetector

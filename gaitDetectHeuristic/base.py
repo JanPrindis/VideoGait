@@ -1,3 +1,5 @@
+import os
+import shutil
 import numpy as np
 from abc import ABC, abstractmethod
 
@@ -6,11 +8,25 @@ from utils.data import get_valid_range, get_keypoints, cubic_interpolate_nan, bu
 
 
 class BaseHeuristicDetector(ABC):
+    """
+    Abstract base class for heuristic-based gait event detectors.
+
+    It handles common tasks such as configuration loading, hip reference calculation,
+    valid range detection, and data segmentation/preprocessing.
+    """
     def __init__(self, full_config):
+        """
+        Initializes the detector with the provided configuration.
+
+        Args:
+            full_config (dict): The full application configuration dictionary.
+        """
         self.config = full_config
 
         self.preprocessing_config = full_config.get("preprocessing", {})
         self.heuristic_config = full_config.get("event_detector", {}).get("heuristic", {})
+        self.visualization_config = full_config.get("visualization", {})
+
 
         # Algorithm specific parameters
         self.algorithm_params = self.heuristic_config.get("params", {})
@@ -26,6 +42,9 @@ class BaseHeuristicDetector(ABC):
         self.filter_cutoff = self.preprocessing_config.get("filter_cutoff", 6)
         self.filter_order = self.preprocessing_config.get("filter_order", 4)
 
+        # Visualization
+        self.save_debug_plot = self.visualization_config.get("event_detector_debug_plots", False)
+
         skel_name = self.heuristic_config.get("skeleton", "HALPE")
         try:
             self.skeleton = get_skeleton_by_name(skel_name)
@@ -33,6 +52,21 @@ class BaseHeuristicDetector(ABC):
             raise ValueError(f"[Heuristic] Skeleton config error: {e}")
 
     def _get_hip_reference_data(self, json_path):
+        """
+        Retrieves or calculates the hip keypoint data to serve as a reference for movement.
+
+        If 'HIP' is present, it is used. Otherwise, it attempts to calculate a virtual hip
+        by averaging 'LEFT_HIP' and 'RIGHT_HIP'.
+
+        Args:
+            json_path (str): Path to the keypoints JSON file.
+
+        Returns:
+            tuple: (hip_data, is_virtual, global_offset)
+                   - hip_data: List of hip keypoints.
+                   - is_virtual: Boolean indicating if hip was calculated.
+                   - global_offset: Frame offset from the start of the video.
+        """
         # Try to get center HIP keypoints
         raw_data, valid_indices = get_keypoints(json_path, self.skeleton, ["HIP"], self.confidence_threshold)
         global_offset = valid_indices[0] if valid_indices else 0
@@ -83,6 +117,16 @@ class BaseHeuristicDetector(ABC):
         return virtual_hip, True
 
     def _prepare_hip_and_ranges(self, json_path):
+        """
+        Prepares the hip reference data and identifies valid walking segments (ranges)
+        based on hip movement.
+
+        Args:
+            json_path (str): Path to the keypoints JSON file.
+
+        Returns:
+            tuple: (hip_data, valid_ranges, is_virtual_hip, global_offset)
+        """
         hip_data, is_virtual_hip, global_offset = self._get_hip_reference_data(json_path)
 
         if not hip_data:
@@ -108,6 +152,20 @@ class BaseHeuristicDetector(ABC):
         return hip_data, valid_ranges, is_virtual_hip, global_offset
 
     def _extract_segment_data(self, json_path, start, end, required_keypoints, hip_data, is_virtual_hip):
+        """
+        Extracts and preprocesses (interpolates and filters) keypoint data for a specific time segment.
+
+        Args:
+            json_path (str): Path to the keypoints JSON file.
+            start (int): Start frame index of the segment.
+            end (int): End frame index of the segment.
+            required_keypoints (list): List of keypoint names to extract.
+            hip_data (list): Pre-loaded hip data.
+            is_virtual_hip (bool): Whether the hip data is virtual (calculated).
+
+        Returns:
+            dict: Dictionary of processed keypoint arrays (N, 2).
+        """
         keys_to_fetch = [k for k in required_keypoints if not (k == "HIP" and is_virtual_hip)]
 
         # Get raw data
@@ -151,11 +209,29 @@ class BaseHeuristicDetector(ABC):
         return processed_data
 
     @abstractmethod
-    def detect_events(self, processed_data):
+    def detect_events(self, processed_data, plot_path: str = None, sequence_number: int = 1):
+        """
+        Abstract method to detect gait events in a processed data segment.
+        Must be implemented by subclasses.
+
+        Args:
+            processed_data (dict): Dictionary of processed keypoint data.
+            plot_path (str, optional): Path to save debug plots.
+            sequence_number (int, optional): Index of the current segment.
+
+        Returns:
+            tuple: (left_events, right_events)
+        """
         pass
 
     @abstractmethod
     def get_required_keypoints(self):
+        """
+        Abstract method returning the list of keypoints required by the specific algorithm.
+
+        Returns:
+            list: List of keypoint names.
+        """
         pass
 
     def run_inference(self, json_path: str, output_dir: str = None):

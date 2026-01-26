@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 from ..utils.registry import HEURISTICS
 from ..base import BaseHeuristicDetector
@@ -9,7 +11,11 @@ from utils.data import butterworth_filter
 class Ghoussayni(BaseHeuristicDetector):
     """
     Implementation of Ghoussayni et al. (2004) with updated thresholds (Bruening et al., 2014).
-    Based on sagittal velocity thresholds.
+    Based on kinematic velocity thresholds of the heel and toe.
+
+    Detection Logic:
+    - HS: Heel velocity drops below a specific threshold (indicating impact).
+    - TO: Toe velocity rises above a specific threshold (indicating lift-off).
     """
 
     def get_required_keypoints(self):

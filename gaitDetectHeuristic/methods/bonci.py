@@ -1,4 +1,6 @@
 import copy
+import os
+
 import numpy as np
 from ..utils.registry import HEURISTICS
 from ..base import BaseHeuristicDetector
@@ -10,8 +12,12 @@ from utils.data import butterworth_filter
 @HEURISTICS.register
 class Bonci(BaseHeuristicDetector):
     """
-    Implementation of Bonci et al. (2022).
-    Refines Zeni's approach by incorporating velocity thresholds relative to walking speed.
+        Implementation of Bonci et al. (2014).
+        Refines Zeni's approach by incorporating velocity thresholds relative to walking speed to filter false positives.
+
+        Detection Logic:
+        - HS: Heel is at maximum forward distance from Hip AND Heel velocity is below a dynamic threshold.
+        - TO: Toe is at maximum backward distance from Hip AND Toe velocity is above a dynamic threshold.
     """
 
     def get_required_keypoints(self):

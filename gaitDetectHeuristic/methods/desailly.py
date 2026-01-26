@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import scipy.signal as signal
 from ..utils.registry import HEURISTICS
@@ -9,7 +11,12 @@ from utils.data import find_minima_maxima, butterworth_filter
 @HEURISTICS.register
 class Desailly(BaseHeuristicDetector):
     """
-    Implementation of the Desailly et al. method (2009).
+    Implementation of Desailly et al. (2009).
+    Uses signal detrending (high-pass filtering) to isolate foot oscillations from the forward progression.
+
+    Detection Logic:
+    - HS: Maximum peak of the high-pass filtered Heel X-coordinate (max forward extension).
+    - TO: Minimum peak of the high-pass filtered Toe X-coordinate (max backward extension).
     """
 
     def get_required_keypoints(self):

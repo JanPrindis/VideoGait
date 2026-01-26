@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 from ..utils.registry import HEURISTICS
 from ..base import BaseHeuristicDetector
@@ -9,8 +11,11 @@ from utils.data import find_minima_maxima, butterworth_filter
 class Hreljac(BaseHeuristicDetector):
     """
     Implementation of Hreljac et al. (2000).
-    HS: Local maximum (impact) of Vertical Heel Acceleration.
-    TO: Local maximum (propulsion) of Horizontal Toe Acceleration.
+    Based on identifying acceleration peaks caused by impact and propulsion forces.
+
+    Detection Logic:
+    - HS: Peak vertical acceleration of the Heel (impact shock).
+    - TO: Peak horizontal acceleration of the Toe (propulsion).
     """
 
     def get_required_keypoints(self):

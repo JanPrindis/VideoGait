@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 from ..utils.registry import HEURISTICS
 from ..base import BaseHeuristicDetector
@@ -8,7 +10,12 @@ from utils.data import find_minima_maxima, butterworth_filter
 @HEURISTICS.register
 class Hsue(BaseHeuristicDetector):
     """
-    Implementation of the Hsue et al. method based on antero-posterior acceleration.
+    Implementation of Hsue et al. (2007).
+    Based on the Antero-Posterior (AP) acceleration patterns of the foot markers.
+
+    Detection Logic:
+    - HS: Local extremum of Heel AP acceleration (rapid deceleration at contact).
+    - TO: Local extremum of Toe AP acceleration (rapid acceleration at push-off).
     """
 
     def get_required_keypoints(self):
