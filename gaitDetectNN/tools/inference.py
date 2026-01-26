@@ -199,7 +199,7 @@ def visualize_results(predictions, events, cfg, save_path):
     plt.close(fig)
 
 
-def run_inference_pipeline(
+def run_nn_inference(
     app_config: Union[str, Dict[str, Any]],
     input_path: str,
     output_dir: str = None

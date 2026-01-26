@@ -11,7 +11,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from gaitDetectNN.tools.inference import run_inference_pipeline
+from gaitDetectNN.tools.inference import run_nn_inference
 
 
 class NeuralNetWrapper:
@@ -46,4 +46,4 @@ class NeuralNetWrapper:
         }
 
         # Output dir = None -> we are not saving the analysis
-        return run_inference_pipeline(mock_config, input_path, output_dir=None)
+        return run_nn_inference(mock_config, input_path, output_dir=None)
