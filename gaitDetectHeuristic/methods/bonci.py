@@ -60,12 +60,12 @@ class Bonci(BaseHeuristicDetector):
 
         # Helper for velocity calculation (only 2D, because we don't have 3D data)
         def get_velocity_2d(kpt_name):
-            raw_x = data[kpt_name][:, 0]
-            raw_y = data[kpt_name][:, 1]
+            raw_x = processed_data[kpt_name][:, 0]
+            raw_y = processed_data[kpt_name][:, 1]
 
             # Smooth raw data
-            smooth_x = butterworth_filter(raw_x, cutoff=6.0, fs=self.framerate, order=4)
-            smooth_y = butterworth_filter(raw_y, cutoff=6.0, fs=self.framerate, order=4)
+            smooth_x = butterworth_filter(raw_x, cutoff=cutoff, fs=self.framerate, order=order)
+            smooth_y = butterworth_filter(raw_y, cutoff=cutoff, fs=self.framerate, order=order)
 
             # Velocity calculation
             vx = np.gradient(smooth_x, dt)
