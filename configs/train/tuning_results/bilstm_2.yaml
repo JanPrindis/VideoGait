@@ -1,0 +1,8 @@
+best_f1: 0.7034293874917497
+params:
+  dense_units: 128
+  dropout: 0.24622215642761858
+  hidden_dim: 128
+  lr: 0.002119590188531974
+  num_layers: 2
+  weight_decay: 0.00012202568028688947
