@@ -13,7 +13,8 @@ import matplotlib.pyplot as plt
 
 # --- PATH SETUP ---
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
-sys.path.append(PROJECT_ROOT)
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
 
 # --- IMPORTS ---
 import gaitDetectNN.models
