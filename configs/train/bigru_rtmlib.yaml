@@ -1,0 +1,81 @@
+experiment_name: "BiGRU_RTMLIB"
+
+preprocessing:
+  confidence_threshold: 0.4
+  exclude_ratio: 0.1
+  min_segment_length: 60
+  outlier_ratio: 0.2
+
+  # Butterworth filter params
+  filter_cutoff: 6
+  filter_order: 4
+
+data:
+  # Relative path from PROJECT_ROOT
+  dataset_root: "dataset/PROCESSED"
+  annotation_root: "annotations"
+  framerate: 60
+
+  skeleton: "HALPE"
+  train_split: 0.8
+  num_workers: 0
+
+  features:
+    keypoints:
+      - "HIP"
+      - "LEFT_HIP"
+      - "RIGHT_HIP"
+      - "LEFT_KNEE"
+      - "RIGHT_KNEE"
+      - "LEFT_ANKLE"
+      - "RIGHT_ANKLE"
+      - "LEFT_HEEL"
+      - "RIGHT_HEEL"
+      - "LEFT_FOOT_INDEX"
+      - "RIGHT_FOOT_INDEX"
+      - "LEFT_SHOULDER"
+      - "RIGHT_SHOULDER"
+    kinematics:
+      - "HIP"
+      - "LEFT_HIP"
+      - "RIGHT_HIP"
+      - "LEFT_KNEE"
+      - "RIGHT_KNEE"
+      - "LEFT_ANKLE"
+      - "RIGHT_ANKLE"
+      - "LEFT_HEEL"
+      - "RIGHT_HEEL"
+      - "LEFT_FOOT_INDEX"
+      - "RIGHT_FOOT_INDEX"
+    angles:
+      - ["LEFT_HIP", "LEFT_KNEE", "LEFT_ANKLE"]
+      - ["RIGHT_HIP", "RIGHT_KNEE", "RIGHT_ANKLE"]
+      - ["LEFT_ANKLE", "LEFT_HEEL", "LEFT_FOOT_INDEX"]
+      - ["RIGHT_ANKLE", "RIGHT_HEEL", "RIGHT_FOOT_INDEX"]
+      - ["LEFT_SHOULDER", "LEFT_HIP", "LEFT_KNEE"]
+      - ["RIGHT_SHOULDER", "RIGHT_HIP", "RIGHT_KNEE"]
+    distances:
+      - ["HIP", "LEFT_HEEL"]
+      - ["HIP", "RIGHT_HEEL"]
+      - ["HIP", "LEFT_FOOT_INDEX"]
+      - ["HIP", "RIGHT_FOOT_INDEX"]
+      - ["LEFT_KNEE", "RIGHT_KNEE"]
+
+model:
+  type: "GaitBiGRU"
+  params:
+    num_layers: 2
+    hidden_dim: 512
+    dense_units: 64
+    dropout: 0.158
+    num_classes: 4
+
+training:
+  optimizer: "AdamW"
+  f1_window_size_ms: 50
+  learning_rate: 0.00084
+  weight_decay: 2.15e-06
+  momentum: 0.9
+  batch_size: 64
+  epochs: 200
+  seed: 3               # Training/Validation split seed
