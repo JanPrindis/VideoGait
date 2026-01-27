@@ -1,4 +1,4 @@
-experiment_name: "LSTM_Baseline_Halpe"
+experiment_name: "LSTM_RTMLIB_Paper"
 
 preprocessing:
   confidence_threshold: 0.4
@@ -71,6 +71,7 @@ model:
 
 training:
   optimizer: "AdamW"    # "Adam", "AdamW", "SGD"
+  f1_window_size_ms: 50
   learning_rate: 0.001
   weight_decay: 0.01
   momentum: 0.9

@@ -172,6 +172,10 @@ def main():
     annotation_root = os.path.join(PROJECT_ROOT, cfg['data'].get('annotation_root', 'annotations'))
     framerate = cfg['data']['framerate']
 
+    # F1 Tolerance Window
+    tolerance_ms = cfg['training'].get('f1_window_size_ms', 50)
+    tolerance_frames = int(round((tolerance_ms / 1000.0) * framerate))
+
     search_pattern = os.path.join(dataset_root, str(framerate), "KEYPOINTS", "*.json")
     print(f"Searching: {search_pattern}")
     keypoint_files = glob(search_pattern, recursive=True)
@@ -254,7 +258,7 @@ def main():
     model_save_path = os.path.join(output_dir, "best_model.pth")
     num_epochs = cfg['training']['epochs']
 
-    trainer = Trainer(model, train_loader, val_loader, criterion, optimizer, device)
+    trainer = Trainer(model, train_loader, val_loader, criterion, optimizer, device, tolerance_frames)
 
     # Run training
     history = trainer.fit(num_epochs=num_epochs, save_path=model_save_path)

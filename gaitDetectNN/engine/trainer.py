@@ -1,9 +1,11 @@
 import torch
 import os
 import copy
+import torch.nn.functional as F
+
 
 class Trainer:
-    def __init__(self, model, train_loader, val_loader, criterion, optimizer, device):
+    def __init__(self, model, train_loader, val_loader, criterion, optimizer, device, f1_tolerance_frames):
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -16,6 +18,7 @@ class Trainer:
         }
 
         # Hybrid saving state
+        self.f1_tolerance_frames = f1_tolerance_frames
         self.best_val_f1 = -1.0             # We are maximizing F1 score
         self.best_val_loss = float('inf')   # We are minimizing loss if F1 score stays the same
         self.best_model_state = copy.deepcopy(self.model.state_dict())
@@ -57,38 +60,64 @@ class Trainer:
             # --- UNPADDED CASE ---
             return self.criterion(logits.reshape(-1, c), labels.reshape(-1, c))
 
-    def _compute_f1(self, logits: torch.Tensor, labels: torch.Tensor, lengths: torch.Tensor):
+    def _compute_windowed_f1(self, logits: torch.Tensor, labels: torch.Tensor, lengths: torch.Tensor,
+                             tolerance: int = 3):
         """
-        Computes F1 score.
+        Computes a windowed F1 score, where a prediction is considered a true positive
+        if it falls within a specified tolerance window around a ground truth event.
+
+        Args:
+            logits (torch.Tensor): The raw output from the model (B, T, C).
+            labels (torch.Tensor): The ground truth labels (B, T, C).
+            lengths (torch.Tensor): The actual sequence lengths for each item in the batch (B,).
+            tolerance (int): The number of frames on either side of an event to
+                             consider a match valid (e.g., tolerance=3 means a 7-frame window).
+
+        Returns:
+            float: The calculated windowed F1 score for the batch.
         """
         with torch.no_grad():
             probabilities = torch.sigmoid(logits)
-            predictions = (probabilities > 0.5).float()
+            predictions = (probabilities > 0.5).float()  # (B, T, C)
 
-            b, t, c = logits.shape
-            labels = labels[:, :t, :]
+            b, t, c = logits.shape  #
+            labels = labels[:, :t, :]  #
 
-            # Mask padding
-            lengths = torch.clamp(lengths, max=t)
-            mask = self._create_mask(lengths, t)
+            # lengths shape (B,), mask shape (B, T)
+            mask = self._create_mask(lengths, t)  #
+            mask = mask.unsqueeze(-1).expand_as(predictions)  # (B, T, C)
 
-            mask_expanded = mask.unsqueeze(-1).expand_as(predictions)
+            # Masking - ignore padding
+            predictions = predictions * mask
+            labels = labels * mask
 
-            active_predictions = predictions[mask_expanded]
-            active_labels = labels[mask_expanded]
+            predictions_flat = predictions.permute(0, 2, 1).reshape(b * c, 1, t)  # (B*C, 1, T)
+            labels_flat = labels.permute(0, 2, 1).reshape(b * c, 1, t)  # (B*C, 1, T)
 
-            if active_predictions.numel() == 0:
-                return 0.0
+            kernel_size = 2 * tolerance + 1
+            padding = tolerance
 
-            # TP, FP, FN calculation
-            tp = (active_predictions * active_labels).sum().item()
-            fp = (active_predictions * (1 - active_labels)).sum().item()
-            fn = ((1 - active_predictions) * active_labels).sum().item()
+            # Dilation
+            labels_dilated = F.max_pool1d(labels_flat, kernel_size=kernel_size, stride=1, padding=padding)
+            labels_dilated = labels_dilated[:, :, :t]
 
-            # F1 Score formula
+            predictions_dilated = F.max_pool1d(predictions_flat, kernel_size=kernel_size, stride=1, padding=padding)
+            predictions_dilated = predictions_dilated[:, :, :t]
+
+            #  TP, FP, FN
+            true_positives_prec = (predictions_flat * labels_dilated).sum().item()
+            predicted_positives = predictions_flat.sum().item()
+
+            true_positives_rec = (labels_flat * predictions_dilated).sum().item()
+            actual_positives = labels_flat.sum().item()
             epsilon = 1e-7
-            precision = tp / (tp + fp + epsilon)
-            recall = tp / (tp + fn + epsilon)
+
+            # Precision
+            precision = true_positives_prec / (predicted_positives + epsilon)
+
+            # Recall
+            recall = true_positives_rec / (actual_positives + epsilon)
+
             f1 = 2 * (precision * recall) / (precision + recall + epsilon)
 
             return f1
@@ -106,7 +135,7 @@ class Trainer:
             logits = self.model(features, lengths.cpu())
 
             loss = self._compute_loss(logits, labels, lengths)
-            f1 = self._compute_f1(logits, labels, lengths)
+            f1 = self._compute_windowed_f1(logits, labels, lengths, tolerance=self.f1_tolerance_frames)
 
             if loss.item() > 0:
                 loss.backward()
@@ -130,7 +159,7 @@ class Trainer:
                 logits = self.model(features, lengths.cpu())
 
                 loss = self._compute_loss(logits, labels, lengths)
-                f1 = self._compute_f1(logits, labels, lengths)
+                f1 = self._compute_windowed_f1(logits, labels, lengths, tolerance=self.f1_tolerance_frames)
 
                 total_loss += loss.item()
                 total_f1 += f1
