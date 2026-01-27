@@ -18,7 +18,7 @@ event_detector:
   method: "NeuralNet" # "NeuralNet" or "Heuristic"
 
   neural_net:
-    experiment_path: "experiments/LSTM_Baseline_Halpe"
+    experiment_path: "experiments/LSTM_RTMLIB_Paper"
     checkpoint: "best_model.pth"
 
     post_processing:
