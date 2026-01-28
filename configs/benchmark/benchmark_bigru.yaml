@@ -32,4 +32,5 @@ data:
   use_full_dataset: False
 
 evaluation:
-  tolerance_ms: 150
+  strict_tolerance_ms: 50
+  loose_tolerance_ms: 150
