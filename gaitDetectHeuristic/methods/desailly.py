@@ -160,7 +160,7 @@ class Desailly(BaseHeuristicDetector):
 
             src = "User" if user_freq else ("Auto" if len(peak_indices) > 1 else "Fallback")
             fig.suptitle(
-                f"Desailly et al. | Walking Freq: {gait_freq:.2f} Hz ({src}) | Cutoffs: HS ~{disp_fc_hs:.2f}Hz, TO ~{disp_fc_to:.2f}Hz",
+                f"Desailly et al. | Moving Right: {is_moving_right} | Walking Freq: {gait_freq:.2f} Hz ({src}) | Cutoffs: HS ~{disp_fc_hs:.2f}Hz, TO ~{disp_fc_to:.2f}Hz",
                 fontsize=14)
 
             current_row = 0

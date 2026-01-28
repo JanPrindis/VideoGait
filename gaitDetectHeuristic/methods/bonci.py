@@ -166,7 +166,7 @@ class Bonci(BaseHeuristicDetector):
             import matplotlib.pyplot as plt
 
             fig, axs = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
-            fig.suptitle(f"Bonci (2022) | Walking Speed: {walking_speed:.2f} px/s", fontsize=14)
+            fig.suptitle(f"Bonci et al. | Walking Speed: {walking_speed:.2f} px/s", fontsize=14)
 
             # Helper - visualize single leg
             def plot_leg_debug(ax, title, heel_vel, toe_vel, base_events, refined_events, side_color):

@@ -109,7 +109,7 @@ class Zeni(BaseHeuristicDetector):
             COL_TO = 'orange'
 
             fig, axs = plt.subplots(2, 2, figsize=(14, 10), sharex=True)
-            fig.suptitle(f"Zeni (Hip-Relative Distance) | Moving Right: {is_moving_right} | Min Dist: {min_dist}",
+            fig.suptitle(f"Zeni et al. | Moving Right: {is_moving_right} | Min Dist: {min_dist}",
                          fontsize=14)
 
             def plot_zeni_leg(ax, signal, peaks, title, line_color, marker_color, peak_type):
