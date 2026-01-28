@@ -59,11 +59,31 @@ def suggest_gru_params(trial):
         "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
     }
 
+def suggest_tcn_params(trial):
+    # Layer calculation
+    num_layers = trial.suggest_int("num_layers", 3, 6)
+    channel_size = trial.suggest_categorical("channel_size", [32, 64, 128])
+    # channel_size = trial.suggest_categorical("channel_size", [128, 256, 512])
+
+    # Create a list of channels, for example [64, 64, 64]
+    num_channels = [channel_size] * num_layers
+
+    return {
+        # Architecture
+        "num_channels": num_channels,
+        "kernel_size": trial.suggest_categorical("kernel_size", [7, 9, 11]),
+        "dropout": trial.suggest_float("dropout", 0.1, 0.4),
+
+        # Training
+        "lr": trial.suggest_float("lr", 1e-4, 2e-3, log=True),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
+    }
 
 SEARCH_SPACES = {
     #"GaitLSTM": suggest_lstm_params,
     "GaitBiLSTM": suggest_bilstm_params,
     "GaitBiGRU": suggest_gru_params,
+    "GaitTCN": suggest_tcn_params,
     #"GaitSTGCN": suggest_stgcn_params,
 }
 
