@@ -1,0 +1,36 @@
+experiment_name: "Benchmark_Transformer"
+output_dir: "benchmarkResults/Transformer"
+
+preprocessing:
+  framerate: 60
+  confidence_threshold: 0.4
+  exclude_ratio: 0.1
+  min_segment_length: 60
+  outlier_ratio: 0.2
+
+  use_filter: true
+
+  # Butterworth filter params
+  filter_cutoff: 6
+  filter_order: 4
+
+event_detector:
+  method: "NeuralNet"
+
+  neural_net:
+    experiment_path: "experiments/Transformer_RTMLIB"
+    checkpoint: "best_model.pth"
+
+    post_processing:
+      threshold: 0.6
+      min_distance_sec: 0.25
+
+data:
+  dataset_root: "dataset/PROCESSED"
+  annotation_root: "annotations"
+
+  use_full_dataset: False
+
+evaluation:
+  strict_tolerance_ms: 50
+  loose_tolerance_ms: 150

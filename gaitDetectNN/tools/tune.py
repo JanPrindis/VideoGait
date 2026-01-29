@@ -81,11 +81,41 @@ def suggest_tcn_params(trial):
         "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
     }
 
+def suggest_transformer_params(trial):
+    # Get model width (d_model)
+    d_model = trial.suggest_categorical("d_model", [32, 64])
+
+    # Pick number of heads based on model width
+    if d_model == 32:
+        n_head = trial.suggest_categorical("n_head_32", [2, 4])
+    else:  # 64
+        n_head = trial.suggest_categorical("n_head_64", [2, 4, 8])
+
+    # Kernel Size (Feature Tokenizer)
+    kernel_size = trial.suggest_categorical("kernel_size", [9, 11, 15, 21])
+    padding = kernel_size // 2
+
+    return {
+        # Architecture Params
+        "d_model": d_model,
+        "n_head": n_head,
+        "num_layers": trial.suggest_int("num_layers", 1, 3),
+        "dim_feedforward": trial.suggest_categorical("dim_feedforward", [64, 128, 256]),
+        "dropout": trial.suggest_float("dropout", 0.05, 0.25),
+        "kernel_size": kernel_size,
+        "padding": padding,
+
+        # Training Params
+        "lr": trial.suggest_float("lr", 5e-4, 5e-3, log=True),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
+    }
+
 SEARCH_SPACES = {
     #"GaitLSTM": suggest_lstm_params,
     "GaitBiLSTM": suggest_bilstm_params,
     "GaitBiGRU": suggest_gru_params,
     "GaitTCN": suggest_tcn_params,
+    "GaitTransformer": suggest_transformer_params,
     #"GaitSTGCN": suggest_stgcn_params,
 }
 
@@ -124,8 +154,6 @@ def objective(trial, base_cfg, train_loader, val_loader, input_size, pos_weight,
 
     # Use pre-calculated weights
     criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-
-    trainer = Trainer(model, train_loader, val_loader, criterion, optimizer, device, f1_window_frame)
 
     # Training
     tuning_epochs = 15
