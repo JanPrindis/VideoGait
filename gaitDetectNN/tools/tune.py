@@ -8,6 +8,7 @@ import numpy as np
 import random
 from glob import glob
 from torch import nn
+from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
 
 # --- IMPORTS ---
@@ -23,6 +24,7 @@ from collate import collate_pad
 from utils.preprocessing import generate_features
 from utils.data import find_matching_annotation
 from skeletons import get_skeleton_by_name
+from train import build_scheduler
 
 
 # ==============================================================================
@@ -128,11 +130,28 @@ def objective(trial, base_cfg, train_loader, val_loader, input_size, pos_weight,
     # Training
     tuning_epochs = 15
 
+    # Config hack
+    tune_training_cfg = base_cfg['training'].copy()
+    tune_training_cfg['learning_rate'] = lr
+    tune_training_cfg['epochs'] = tuning_epochs
+
+    scheduler = build_scheduler(
+        optimizer,
+        tune_training_cfg,
+        steps_per_epoch=len(train_loader)
+    )
+
+    trainer = Trainer(model, train_loader, val_loader, criterion, optimizer, scheduler, device, f1_window_frame)
+
     try:
         val_f1 = None
         for epoch in range(tuning_epochs):
             train_loss, train_f1 = trainer.train_epoch()
             val_loss, val_f1 = trainer.validate_epoch()
+
+            # Epoch based schedulers stepping
+            if scheduler is not None and not isinstance(scheduler, OneCycleLR):
+                scheduler.step()
 
             # Report result to Optuna
             trial.report(val_f1, epoch)

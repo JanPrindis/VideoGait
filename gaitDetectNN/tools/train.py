@@ -8,6 +8,8 @@ import random
 import json
 import shutil
 from glob import glob
+
+from torch.optim.lr_scheduler import OneCycleLR, StepLR
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
@@ -60,6 +62,38 @@ def build_optimizer(model, training_cfg):
 
     else:
         raise ValueError(f"Unsupported optimizer type: {opt_type}")
+
+
+def build_scheduler(optimizer, training_cfg, steps_per_epoch):
+    """
+    Creates a Learning Rate Scheduler based on config.
+    """
+    sched_type = training_cfg.get('scheduler', None)
+
+    if not sched_type:
+        return None
+
+    # Load scheduler specific config
+    sched_params = training_cfg.get('scheduler_config', {})
+    if sched_params is None: sched_params = {}
+
+    print(f"[Scheduler] Initializing {sched_type} with params: {sched_params}")
+
+    if sched_type == 'OneCycleLR':
+        return OneCycleLR(
+            optimizer,
+            max_lr=float(training_cfg['learning_rate']),
+            epochs=int(training_cfg['epochs']),
+            steps_per_epoch=steps_per_epoch,
+            **sched_params
+        )
+
+    elif sched_type == 'StepLR':
+        return StepLR(optimizer, **sched_params)
+
+    else:
+        print(f"Warning: Unknown scheduler type '{sched_type}'. No scheduler used.")
+        return None
 
 
 def save_history(history, output_dir):
@@ -253,12 +287,17 @@ def main():
     # TRAINING
     optimizer = build_optimizer(model, cfg['training'])
     criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight_tensor)
+    scheduler = build_scheduler(
+        optimizer,
+        cfg['training'],
+        steps_per_epoch=len(train_loader)
+    )
 
     # Result path
     model_save_path = os.path.join(output_dir, "best_model.pth")
     num_epochs = cfg['training']['epochs']
 
-    trainer = Trainer(model, train_loader, val_loader, criterion, optimizer, device, tolerance_frames)
+    trainer = Trainer(model, train_loader, val_loader, criterion, optimizer, scheduler, device, tolerance_frames)
 
     # Run training
     history = trainer.fit(num_epochs=num_epochs, save_path=model_save_path)

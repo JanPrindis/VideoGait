@@ -2,15 +2,17 @@ import torch
 import os
 import copy
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import OneCycleLR
 
 
 class Trainer:
-    def __init__(self, model, train_loader, val_loader, criterion, optimizer, device, f1_tolerance_frames):
+    def __init__(self, model, train_loader, val_loader, criterion, optimizer, scheduler, device, f1_tolerance_frames):
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.criterion = criterion
         self.optimizer = optimizer
+        self.scheduler = scheduler
         self.device = device
         self.history = {
             'train_loss': [], 'val_loss': [],
@@ -141,6 +143,10 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
 
+                # OneCycleLR is called per batch
+                if self.scheduler is not None and isinstance(self.scheduler, OneCycleLR):
+                    self.scheduler.step()
+
             total_loss += loss.item()
             total_f1 += f1
 
@@ -173,12 +179,18 @@ class Trainer:
                 train_loss, train_f1 = self.train_epoch()
                 val_loss, val_f1 = self.validate_epoch()
 
+                if self.scheduler is not None and not isinstance(self.scheduler, OneCycleLR):
+                    self.scheduler.step()
+
+                current_lr = self.optimizer.param_groups[0]['lr']
+
                 self.history['train_loss'].append(train_loss)
                 self.history['val_loss'].append(val_loss)
                 self.history['train_f1'].append(train_f1)
                 self.history['val_f1'].append(val_f1)
 
                 print(f"Epoch {epoch + 1}/{num_epochs} | "
+                      f"LR: {current_lr:.6f} | "
                       f"Loss: {train_loss:.4f}/{val_loss:.4f} | "
                       f"F1: {train_f1:.4f}/{val_f1:.4f}", end="")
 
