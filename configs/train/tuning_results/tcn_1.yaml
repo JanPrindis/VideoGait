@@ -1,8 +1,0 @@
-best_f1: 0.6505063142017442
-params:
-  num_layers: 3
-  channel_size: 64
-  kernel_size: 7
-  dropout: 0.12717428603478304
-  lr: 0.000548620444256063
-  weight_decay: 0.0001875267497358503

@@ -64,22 +64,22 @@ data:
 model:
   type: "GaitTransformer"
   params:
-      d_model: 256           # Embedding size
-      n_head: 4              # Number of attention heads
-      num_layers: 2          # Number of encoder layers (depth)
-      dim_feedforward: 512   # Expansion factor for MLP
-      dropout: 0.26
-      kernel_size: 11
-      padding: 5             # 11 // 2 = 5
+      d_model: 64           # Embedding size
+      n_head: 8              # Number of attention heads
+      num_layers: 1          # Number of encoder layers (depth)
+      dim_feedforward: 256   # Expansion factor for MLP
+      dropout: 0.05
+      kernel_size: 15
+      padding: 7             # (kernel_size // 2)
       num_classes: 4
 
 training:
   optimizer: "AdamW"
   f1_window_size_ms: 50
-  learning_rate: 0.00063
-  weight_decay: 0.0014
+  learning_rate: 0.0025
+  weight_decay: 0.00003
   momentum: 0.9
-  batch_size: 64
+  batch_size: 16
   epochs: 200
   seed: 3               # Training/Validation split seed
 

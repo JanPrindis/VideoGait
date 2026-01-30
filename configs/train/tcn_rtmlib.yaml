@@ -64,17 +64,24 @@ data:
 model:
   type: "GaitTCN"
   params:
-    num_channels: [64, 64, 64]
-    kernel_size: 7
-    dropout: 0.127
+    num_channels: [256, 256, 256, 256]
+    kernel_size: 5
+    dropout: 0.2
     num_classes: 4
 
 training:
   optimizer: "AdamW"
   f1_window_size_ms: 50
-  learning_rate: 0.00055
-  weight_decay: 0.00019
+  learning_rate: 0.0047
+  weight_decay: 0.00014
   momentum: 0.9
-  batch_size: 64
+  batch_size: 16
   epochs: 200
   seed: 3               # Training/Validation split seed
+
+  scheduler: "OneCycleLR"
+  scheduler_config:
+    pct_start: 0.3
+    div_factor: 25.0
+    final_div_factor: 10000.0
+    anneal_strategy: "cos"
