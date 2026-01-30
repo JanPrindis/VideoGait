@@ -302,8 +302,8 @@ def run_benchmark():
         min_val = vals.min()
         max_val = vals.max()
 
-        plot_min = min(min_val, 0) - 2
-        plot_max = max(max_val, 0) + 2
+        plot_min = min(min_val, 0)
+        plot_max = max(max_val, 0)
         full_range = list(range(plot_min, plot_max + 1))
 
         # Fill missing values
@@ -357,8 +357,8 @@ def run_benchmark():
         min_val = vals.min()
         max_val = vals.max()
 
-        plot_min = min(min_val, 0) - 2
-        plot_max = max(max_val, 0) + 2
+        plot_min = min(min_val, 0)
+        plot_max = max(max_val, 0)
         full_range = list(range(plot_min, plot_max + 1))
 
         counts = vals.value_counts().reindex(full_range, fill_value=0)
