@@ -10,7 +10,7 @@ class TemporalBlock(nn.Module):
     Plus Residual connection
     """
 
-    def __init__(self, n_inputs, n_outputs, kernel_size, stride, dilation, dropout=0.2):
+    def __init__(self, n_inputs, n_outputs, kernel_size, stride, dilation, dropout=0.2, **kwargs):
         super(TemporalBlock, self).__init__()
 
         # Calculate padding based on dilation and kernel size

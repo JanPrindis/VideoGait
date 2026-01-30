@@ -5,7 +5,7 @@ from gaitDetectNN.utils.registry import MODELS
 
 @MODELS.register
 class GaitBiGRU(nn.Module):
-    def __init__(self, input_size, hidden_dim=128, dense_units=64, num_layers=2, num_classes=4, dropout=0.3):
+    def __init__(self, input_size, hidden_dim=128, dense_units=64, num_layers=2, num_classes=4, dropout=0.3, **kwargs):
         super().__init__()
 
         # GRU Layer

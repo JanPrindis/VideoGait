@@ -17,7 +17,8 @@ class GaitLSTM(nn.Module):
                  num_classes: int = 4,
                  lstm_units: int = 128,
                  dense_units: int = 32,
-                 dropout_prob: float = 0.3):
+                 dropout_prob: float = 0.3,
+                 **kwargs):
         """
         Args:
             input_size (int): The number of features for each frame.

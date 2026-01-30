@@ -5,7 +5,7 @@ from gaitDetectNN.utils.registry import MODELS
 
 @MODELS.register
 class GaitBiLSTM(nn.Module):
-    def __init__(self, input_size, hidden_dim=64, dense_units=32, num_layers=2, num_classes=4, dropout=0.2):
+    def __init__(self, input_size, hidden_dim=64, dense_units=32, num_layers=2, num_classes=4, dropout=0.2, **kwargs):
         super().__init__()
 
         self.lstm = nn.LSTM(

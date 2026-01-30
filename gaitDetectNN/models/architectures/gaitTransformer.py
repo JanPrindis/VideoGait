@@ -43,8 +43,19 @@ class GaitTransformer(nn.Module):
     Input -> Conv1D Projection -> Positional Encoding -> Transformer Encoder Layers -> Linear Head
     """
 
-    def __init__(self, input_size, d_model=128, kernel_size=3, padding=1, n_head=4, num_layers=3,
-                 dim_feedforward=512, dropout=0.1, num_classes=4, max_len=5000):
+    def __init__(
+            self,
+            input_size,
+            d_model=128,
+            kernel_size=3,
+            padding=1,
+            n_head=4,
+            num_layers=3,
+            dim_feedforward=512,
+            dropout=0.1,
+            num_classes=4,
+            max_len=5000,
+            **kwargs):
         super().__init__()
 
         self.d_model = d_model
