@@ -237,6 +237,8 @@ def main():
     skeleton_name = cfg['data']['skeleton']
     skeleton_def = get_skeleton_by_name(skeleton_name)
 
+    features_cfg = cfg['data'].get('features', {})
+
     preprocess_args = {
         "skeleton_definition": skeleton_def,
         "confidence_threshold": cfg['preprocessing'].get('confidence_threshold', 0.4),
@@ -245,10 +247,10 @@ def main():
         "outlier_ratio": cfg['preprocessing'].get('outlier_ratio', 0.2),
         "filter_cutoff": cfg['preprocessing'].get('filter_cutoff', 6),
         "filter_order": cfg['preprocessing'].get('filter_order', 4),
-        "keypoints": cfg['data']['features']['keypoints'],
-        "kinematics_keypoints": cfg['data']['features']['kinematics'],
-        "angle_triplets": cfg['data']['features']['angles'],
-        "distance_pairs": cfg['data']['features']['distances'],
+        "keypoints": features_cfg.get('keypoints'),
+        "kinematics_keypoints": features_cfg.get('kinematics'),
+        "angle_triplets": features_cfg.get('angles'),
+        "distance_pairs": features_cfg.get('distances'),
     }
 
     # Loaders
@@ -278,6 +280,23 @@ def main():
     pos_weight = negatives / positives if positives > 0 else 1.0
     pos_weight_tensor = torch.tensor([pos_weight], device=device)
     print(f"Pos Weight: {pos_weight:.2f}")
+
+    # Adjacency matrix flag
+    if cfg['data'].get('requires_adj_matrix', False):
+        print("[Config] 'requires_adj_matrix' is True -> Injecting feature config to model.")
+
+        features_cfg = cfg['data']['features']
+
+        # Requirements: Config must not contain angles or distances
+        if features_cfg.get('angles') or features_cfg.get('distances'):
+            raise ValueError("[Config] ERROR: 'requires_adj_matrix=true' does not support 'angles' or 'distances'.")
+
+        # Inject parameters into model - so model can build adjacency matrix
+        if 'params' not in cfg['model']:
+            cfg['model']['params'] = {}
+
+        cfg['model']['params']['features_config'] = features_cfg
+        cfg['model']['params']['skeleton_name'] = cfg['data']['skeleton']
 
     # BUILD MODEL
     input_size = train_dataset.data[0][0].shape[1]

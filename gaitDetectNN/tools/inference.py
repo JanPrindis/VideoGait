@@ -59,6 +59,18 @@ def load_train_config_and_model(experiment_path, checkpoint_name, input_size, de
     with open(train_cfg_path, 'r') as f:
         train_cfg = yaml.safe_load(f)
 
+    # Adjacency matrix injection
+    if train_cfg['data'].get('requires_adj_matrix', False):
+        print("[Inference] 'requires_adj_matrix' is True -> Injecting feature config to model.")
+
+        features_cfg = train_cfg['data']['features']
+
+        if 'params' not in train_cfg['model']:
+            train_cfg['model']['params'] = {}
+
+        train_cfg['model']['params']['features_config'] = features_cfg
+        train_cfg['model']['params']['skeleton_name'] = train_cfg['data']['skeleton']
+
     # Build model
     print(f"[Model] Building architecture: {train_cfg['model']['type']} (Input Size: {input_size})")
     model = build_model(train_cfg['model'], input_size=input_size)
@@ -292,10 +304,10 @@ def run_nn_inference(
         "skeleton_definition": skeleton_def,
         "confidence_threshold": cfg['preprocessing'].get('confidence_threshold', 0.5),
         "exclude_ratio": cfg['preprocessing'].get('exclude_ratio', 0.1),
-        "keypoints": feat_def['keypoints'],
-        "kinematics_keypoints": feat_def['kinematics'],
-        "angle_triplets": feat_def['angles'],
-        "distance_pairs": feat_def['distances'],
+        "keypoints": feat_def.get('keypoints'),
+        "kinematics_keypoints": feat_def.get('kinematics'),
+        "angle_triplets": feat_def.get('angles'),
+        "distance_pairs": feat_def.get('distances'),
         "filter_cutoff": train_cfg['preprocessing'].get('filter_cutoff', 6),
         "filter_order": train_cfg['preprocessing'].get('filter_order', 4),
         "min_segment_length": train_cfg['preprocessing'].get('min_segment_length', 60),
@@ -394,20 +406,24 @@ def run_nn_inference(
 
 
 if __name__ == "__main__":
-    config = "configs/apps/analyze_video.yaml"
-    input_path = "dataset/PROCESSED/60/KEYPOINTS/PD_006_MD.json"
-    output_dir = "results/test_patient_lstm"
 
-    data = run_nn_inference(config, input_path, output_dir)
-    print("Test")
+    nets = ["bigru", "bilstm", "lstm", "stgcn_keypoints", "stgcn_kinematics", "transformer", "tcn"]
 
-    from gaitStructs import build_phases_from_events
-    from visualizeGaitPhases import visualize_gait_phases, print_statistics
+    for net in nets:
+        config = f"configs/apps/analyze_video_{net}.yaml"
+        input_path = "dataset/PROCESSED/60/KEYPOINTS/PD_006_MD.json"
+        output_dir = f"results/test_patient_{net}"
 
-    l_phases, r_phases, support_phases = build_phases_from_events(
-        data["events"],
-        data["global_ranges"]
-    )
+        data = run_nn_inference(config, input_path, output_dir)
+        print(f"Testing {net}...")
 
-    print_statistics(l_phases, r_phases, support_phases)
-    visualize_gait_phases(l_phases, r_phases, support_phases)
+        from gaitStructs import build_phases_from_events
+        from visualizeGaitPhases import visualize_gait_phases, print_statistics
+
+        l_phases, r_phases, support_phases = build_phases_from_events(
+            data["events"],
+            data["global_ranges"]
+        )
+
+        print_statistics(l_phases, r_phases, support_phases)
+        visualize_gait_phases(l_phases, r_phases, support_phases)

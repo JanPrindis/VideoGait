@@ -1,0 +1,68 @@
+experiment_name: "STGCN_Keypoints_RTMLIB"
+
+preprocessing:
+  confidence_threshold: 0.4
+  exclude_ratio: 0.1
+  min_segment_length: 60
+  outlier_ratio: 0.2
+
+  # Butterworth filter params
+  filter_cutoff: 6
+  filter_order: 4
+
+data:
+  # Relative path from PROJECT_ROOT
+  dataset_root: "dataset/PROCESSED"
+  annotation_root: "annotations"
+  framerate: 60
+
+  skeleton: "HALPE"
+  requires_adj_matrix: true
+
+  train_split: 0.8
+  num_workers: 0
+
+  # Only works with keypoint data
+  features:
+    keypoints:
+      - "HIP"
+      - "LEFT_HIP"
+      - "RIGHT_HIP"
+      - "LEFT_KNEE"
+      - "RIGHT_KNEE"
+      - "LEFT_ANKLE"
+      - "RIGHT_ANKLE"
+      - "LEFT_HEEL"
+      - "RIGHT_HEEL"
+      - "LEFT_FOOT_INDEX"
+      - "RIGHT_FOOT_INDEX"
+      - "LEFT_SHOULDER"
+      - "RIGHT_SHOULDER"
+
+model:
+  type: "GaitSTGCN"
+  params:
+      tcn_kernel_size: 15
+      hidden_channels: 128
+      num_layers: 6
+      dropout: 0.15
+      num_classes: 4
+      graph_strategy: uniform # Uniform | Spacial
+
+training:
+  optimizer: "AdamW"
+  f1_window_size_ms: 50
+  learning_rate: 0.00387
+  weight_decay: 0.00005
+  momentum: 0.9
+  batch_size: 16
+  epochs: 200
+  seed: 3               # Training/Validation split seed
+
+  # Optional scheduler config
+  scheduler: "OneCycleLR"
+  scheduler_config:
+    pct_start: 0.3            # warmup
+    div_factor: 25.0          # start_lr = max_lr / div_factor
+    final_div_factor: 10000.0 # final_lr = max_lr / final_div_factor
+    anneal_strategy: "cos"    # cos | linear

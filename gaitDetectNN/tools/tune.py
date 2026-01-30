@@ -34,23 +34,23 @@ from train import build_scheduler
 def suggest_bilstm_params(trial):
     return {
         # Architecture
-        "hidden_dim": trial.suggest_categorical("hidden_dim", [64, 128, 256]),
+        "hidden_dim": trial.suggest_categorical("hidden_dim", [256, 512, 768]),
         # "hidden_dim": trial.suggest_categorical("hidden_dim", [128, 256, 512]),
         "num_layers": trial.suggest_int("num_layers", 1, 3),
-        "dropout": trial.suggest_float("dropout", 0.1, 0.5),
+        "dropout": trial.suggest_float("dropout", 0.2, 0.6),
         "dense_units": trial.suggest_categorical("dense_units", [32, 64, 128]),
 
         # Training
-        "lr": trial.suggest_float("lr", 1e-4, 1e-2, log=True),
-        "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-2, log=True)
+        "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
     }
 
 def suggest_gru_params(trial):
     return {
         # Architecture
         # "hidden_dim": trial.suggest_categorical("hidden_dim", [128, 256]),
-        "hidden_dim": trial.suggest_categorical("hidden_dim", [512, 768, 1024]),
-        "num_layers": trial.suggest_int("num_layers", 2, 3),
+        "hidden_dim": trial.suggest_categorical("hidden_dim", [256, 512, 768]),
+        "num_layers": trial.suggest_int("num_layers", 1, 3),
         # "dropout": trial.suggest_float("dropout", 0.1, 0.4),
         "dropout": trial.suggest_float("dropout", 0.12, 0.5),
         "dense_units": trial.suggest_categorical("dense_units", [32, 64, 128]),
@@ -63,8 +63,8 @@ def suggest_gru_params(trial):
 
 def suggest_tcn_params(trial):
     # Layer calculation
-    num_layers = trial.suggest_int("num_layers", 3, 6)
-    channel_size = trial.suggest_categorical("channel_size", [32, 64, 128])
+    num_layers = trial.suggest_int("num_layers", 2, 5)
+    channel_size = trial.suggest_categorical("channel_size", [64, 128, 256, 512])
     # channel_size = trial.suggest_categorical("channel_size", [128, 256, 512])
 
     # Create a list of channels, for example [64, 64, 64]
@@ -73,12 +73,12 @@ def suggest_tcn_params(trial):
     return {
         # Architecture
         "num_channels": num_channels,
-        "kernel_size": trial.suggest_categorical("kernel_size", [7, 9, 11]),
+        "kernel_size": trial.suggest_categorical("kernel_size", [5, 7, 9, 11]),
         "dropout": trial.suggest_float("dropout", 0.1, 0.4),
 
         # Training
-        "lr": trial.suggest_float("lr", 1e-4, 2e-3, log=True),
-        "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
+        "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
     }
 
 def suggest_transformer_params(trial):
@@ -86,27 +86,48 @@ def suggest_transformer_params(trial):
     d_model = trial.suggest_categorical("d_model", [32, 64])
 
     # Pick number of heads based on model width
-    if d_model == 32:
-        n_head = trial.suggest_categorical("n_head_32", [2, 4])
-    else:  # 64
-        n_head = trial.suggest_categorical("n_head_64", [2, 4, 8])
+    if d_model == 64:
+        n_head = trial.suggest_categorical("n_head_64", [2, 4])
+    elif d_model == 128:
+        n_head = trial.suggest_categorical("n_head_128", [2, 4, 8])
+    else:  # 256
+        n_head = trial.suggest_categorical("n_head_256", [4, 8])
 
     # Kernel Size (Feature Tokenizer)
-    kernel_size = trial.suggest_categorical("kernel_size", [9, 11, 15, 21])
+    kernel_size = trial.suggest_categorical("kernel_size", [5, 9, 11, 15])
     padding = kernel_size // 2
 
     return {
         # Architecture Params
         "d_model": d_model,
         "n_head": n_head,
-        "num_layers": trial.suggest_int("num_layers", 1, 3),
-        "dim_feedforward": trial.suggest_categorical("dim_feedforward", [64, 128, 256]),
-        "dropout": trial.suggest_float("dropout", 0.05, 0.25),
+        "num_layers": trial.suggest_int("num_layers", 1, 4),
+        "dim_feedforward": trial.suggest_categorical("dim_feedforward", [64, 128, 256, 512]),
+        "dropout": trial.suggest_float("dropout", 0.2, 0.5),
         "kernel_size": kernel_size,
         "padding": padding,
 
         # Training Params
-        "lr": trial.suggest_float("lr", 5e-4, 5e-3, log=True),
+        "lr": trial.suggest_float("lr", 1e-4, 2e-3, log=True),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
+    }
+
+
+def suggest_stgcn_params(trial):
+    return {
+        # Architecture
+        "hidden_channels": trial.suggest_categorical("hidden_channels", [32, 64, 128]),
+        # "hidden_channels": trial.suggest_categorical("hidden_channels", [128]),
+        "num_layers": trial.suggest_int("num_layers", 4, 9),
+        # "tcn_kernel_size": trial.suggest_categorical("tcn_kernel_size", [15]),
+        "tcn_kernel_size": trial.suggest_categorical("tcn_kernel_size", [7, 9, 15, 21]),
+        "dropout": trial.suggest_float("dropout", 0.1, 0.5),
+
+        # Graph Strategy
+        "graph_strategy": trial.suggest_categorical("graph_strategy", ["uniform", "spatial"]),
+
+        # Training
+        "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
         "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
     }
 
@@ -116,7 +137,7 @@ SEARCH_SPACES = {
     "GaitBiGRU": suggest_gru_params,
     "GaitTCN": suggest_tcn_params,
     "GaitTransformer": suggest_transformer_params,
-    #"GaitSTGCN": suggest_stgcn_params,
+    "GaitSTGCN": suggest_stgcn_params,
 }
 
 
@@ -146,6 +167,11 @@ def objective(trial, base_cfg, train_loader, val_loader, input_size, pos_weight,
         "type": model_type,
         "params": model_params
     }
+
+    # Keypoint data injection for adjacency matrix calculation
+    if base_cfg['data'].get('requires_adj_matrix', False):
+        current_model_cfg['params']['features_config'] = base_cfg['data']['features']
+        current_model_cfg['params']['skeleton_name'] = base_cfg['data']['skeleton']
 
     model = build_model(current_model_cfg, input_size)
 
@@ -235,7 +261,7 @@ def main():
             file_paths.append((kp_path, ann_path))
 
     # Shuffle & Split
-    random.seed(cfg['training'].get('seed', 42))
+    random.seed(cfg['training'].get('seed', 3))
     random.shuffle(file_paths)
     split_idx = int(len(file_paths) * cfg['data'].get('train_split', 0.8))
     train_paths = file_paths[:split_idx]
@@ -243,6 +269,7 @@ def main():
 
     # Preprocessing Config
     skeleton_def = get_skeleton_by_name(cfg['data']['skeleton'])
+    features_cfg = cfg['data'].get('features', {})
     preprocess_args = {
         "skeleton_definition": skeleton_def,
         "confidence_threshold": cfg['preprocessing'].get('confidence_threshold', 0.4),
@@ -251,15 +278,15 @@ def main():
         "outlier_ratio": cfg['preprocessing'].get('outlier_ratio', 0.2),
         "filter_cutoff": cfg['preprocessing'].get('filter_cutoff', 6),
         "filter_order": cfg['preprocessing'].get('filter_order', 4),
-        "keypoints": cfg['data']['features']['keypoints'],
-        "kinematics_keypoints": cfg['data']['features']['kinematics'],
-        "angle_triplets": cfg['data']['features']['angles'],
-        "distance_pairs": cfg['data']['features']['distances'],
+        "keypoints": features_cfg.get('keypoints'),
+        "kinematics_keypoints": features_cfg.get('kinematics'),
+        "angle_triplets": features_cfg.get('angles'),
+        "distance_pairs": features_cfg.get('distances'),
     }
 
     print("Loading datasets...")
-    train_dataset = GaitDataset(train_paths, preprocessing_fn=generate_features, **preprocess_args)  #
-    val_dataset = GaitDataset(val_paths, preprocessing_fn=generate_features, **preprocess_args)  #
+    train_dataset = GaitDataset(train_paths, preprocessing_fn=generate_features, **preprocess_args)
+    val_dataset = GaitDataset(val_paths, preprocessing_fn=generate_features, **preprocess_args)
 
     if not train_dataset.data:
         raise RuntimeError("Train dataset empty!")
