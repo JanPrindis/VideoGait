@@ -1,0 +1,46 @@
+preprocessing:
+  framerate: 60             # Default value, is used for Heuristic detection, if NN is used, it will match the framerate the model has been trained on. The input video will be interpolated to this value.
+  confidence_threshold: 0.4 # Keypoints under this confidence are ignored
+  exclude_ratio: 0.1        # % of patient movement to ignore on both edges (incomplete detection, or patient turning)
+  min_segment_length: 60
+  outlier_ratio: 0.2
+
+  use_filter: true    # Use Butterworth filter for smoothing
+
+  # Butterworth filter params
+  filter_cutoff: 6
+  filter_order: 4
+
+output:
+  output_root_dir: "results"
+  save_video: true
+  save_report: true
+
+# Keypoint detector
+pose_detector:
+  type: "rtmlib"
+  #config_path: "configs/detectors/rtmlib.yaml" - does not exist yet, will do when merging the full project
+
+# Gait event detection
+event_detector:
+  #"NeuralNet" or "Heuristic"
+  method: "NeuralNet"
+
+  # NeuralNet configuration
+  neural_net:
+    experiment_path: "experiments/Transformer_RTMLIB"   # Name of the experiment folder
+    checkpoint: "best_model.pth"                        # Name of the checkpoint file (stays the same)
+
+    post_processing:
+      threshold: 0.4            # Gait event minimal confidence threshold
+      min_distance_sec: 0.25    # Minimal time distance (in seconds) of subsequent gait events of the same type (duplicate detections)
+
+
+# Visualization (placeholder)
+visualization:
+  output_type: "pdf" # pdf / md / console
+  event_detector_debug_plots: true  # Save debug plots of gait event detector (for validation, or fine-tuning)
+
+  events_color_map:
+    L_HS: [255, 0, 0]
+    R_HS: [0, 0, 255]

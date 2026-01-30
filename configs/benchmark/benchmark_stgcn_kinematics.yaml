@@ -1,0 +1,38 @@
+experiment_name: "Benchmark_ST-GCN_Kinematics_RTMLIB"
+output_dir: "benchmarkResults/STGCN_Kinematics_RTMLIB"
+
+preprocessing:
+  framerate: 60
+  confidence_threshold: 0.4
+  exclude_ratio: 0.1
+  min_segment_length: 60
+  outlier_ratio: 0.2
+
+  use_filter: true    # Use Butterworth filter for smoothing
+
+  # Butterworth filter params
+  filter_cutoff: 6
+  filter_order: 4
+
+event_detector:
+  method: "NeuralNet"
+
+  neural_net:
+    experiment_path: "experiments/STGCN_Kinematics_RTMLIB"
+    checkpoint: "best_model.pth"
+
+    post_processing:
+      threshold: 0.6
+      min_distance_sec: 0.25
+
+
+data:
+  dataset_root: "dataset/PROCESSED"
+  annotation_root: "annotations"
+
+  # If true, the whole dataset is used, if false, only the validation part of the seed is used.
+  use_full_dataset: False
+
+evaluation:
+  strict_tolerance_ms: 50
+  loose_tolerance_ms: 150
