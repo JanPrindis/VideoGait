@@ -1,7 +1,7 @@
 import os
 import importlib
 
-from gaitDetectHeuristic.utils.registry import HEURISTICS
+from utils.registry import HEURISTICS
 
 methods_dir = os.path.dirname(__file__)
 

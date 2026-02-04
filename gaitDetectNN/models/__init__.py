@@ -8,7 +8,7 @@ automatically added to the registry when this package is imported.
 import os
 import importlib
 
-from gaitDetectNN.utils.registry import MODELS
+from utils.registry import MODELS
 
 arch_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "architectures")
 for file in os.listdir(arch_dir):
