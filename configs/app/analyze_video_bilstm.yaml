@@ -18,8 +18,7 @@ output:
 
 # Keypoint detector
 pose_detector:
-  type: "rtmlib"
-  #config_path: "configs/detectors/rtmlib.yaml" - does not exist yet, will do when merging the full project
+  config_path: "configs/detectors/rtmlib_config.yaml"
 
 # Gait event detection
 event_detector:
@@ -28,7 +27,7 @@ event_detector:
 
   # NeuralNet configuration
   neural_net:
-    experiment_path: "experiments/STGCN_Keypoints_RTMLIB"   # Name of the experiment folder
+    experiment_path: "experiments/BiLSTM_RTMLIB"        # Name of the experiment folder
     checkpoint: "best_model.pth"                        # Name of the checkpoint file (stays the same)
 
     post_processing:

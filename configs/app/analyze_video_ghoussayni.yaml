@@ -18,8 +18,7 @@ output:
 
 # Keypoint detector
 pose_detector:
-  type: "rtmlib"
-  #config_path: "configs/detectors/rtmlib.yaml" - does not exist yet, will do when merging the full project
+  config_path: "configs/detectors/rtmlib_config.yaml"
 
 # Gait event detection
 event_detector:
@@ -33,22 +32,22 @@ event_detector:
 
     post_processing:
       threshold: 0.4            # Gait event minimal confidence threshold
-      min_distance_sec: 0.25    # Minimal time distance (in seconds) of subsequent gait events of the same type (duplicate detections)
+      min_distance_sec: 0.35    # Minimal time distance (in seconds) of subsequent gait events of the same type (duplicate detections)
 
   # Heuristic configuration
   heuristic:
-    method: "Hsue"
+    method: "Ghoussayni"
     skeleton: "HALPE"
 
     # Method specific parameters
     params:
-      # Peak detection parameters
-      min_peak_distance: 20
-      prominence: null
+      # If null, ratio is used. If number (e.g. 50), it is used as fixed threshold (cm/s).
+      velocity_threshold: null
+      velocity_threshold_ratio: 0.15 # % of max movement speed
 
-      # Extra Butterworth smoothing filter for second derivative
-      foot_accel_filter_cutoff: 2
-      foot_accel_filter_order: 2
+      # Butterworth filter config for smoothing data for velocity calculation
+      velocity_filter_cutoff: 6
+      velocity_filter_order: 2
 
 # Visualization (placeholder)
 visualization:

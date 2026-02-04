@@ -18,8 +18,7 @@ output:
 
 # Keypoint detector
 pose_detector:
-  type: "rtmlib"
-  #config_path: "configs/detectors/rtmlib.yaml" - does not exist yet, will do when merging the full project
+  config_path: "configs/detectors/rtmlib_config.yaml"
 
 # Gait event detection
 event_detector:
@@ -37,19 +36,15 @@ event_detector:
 
   # Heuristic configuration
   heuristic:
-    method: "Desailly"
+    method: "Hreljac"
     skeleton: "HALPE"
 
     # Method specific parameters
     params:
-      gait_frequency: null    # (float) If we know the frequency, if left null, it is estimated automatically
-
-      # Used for high-pass filter cutoff calculation (gait frequency * cutoff_factor)
-      hs_cutoff_factor: 0.5    # 0.5 according to the paper
-      to_cutoff_factor: 1.1    # 1.1 according to the paper
-
-      min_peak_distance: 30
+      min_peak_distance: 20
       prominence: null
+      accel_filter_cutoff: 2.0   # Aggressive filtering because we are calculating acceleration
+      accel_filter_order: 6
 
 # Visualization (placeholder)
 visualization:

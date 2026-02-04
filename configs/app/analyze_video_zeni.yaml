@@ -18,8 +18,7 @@ output:
 
 # Keypoint detector
 pose_detector:
-  type: "rtmlib"
-  #config_path: "configs/detectors/rtmlib.yaml" - does not exist yet, will do when merging the full project
+  config_path: "configs/detectors/rtmlib_config.yaml"
 
 # Gait event detection
 event_detector:
@@ -37,15 +36,13 @@ event_detector:
 
   # Heuristic configuration
   heuristic:
-    method: "OConnor"
+    method: "Zeni"
     skeleton: "HALPE"
 
     # Method specific parameters
     params:
-      velocity_filter_order: 9
-      velocity_filter_cutoff: 3.0
-      prominence: null                  # If left null, it will be calculated based on the data
-      adaptive_prominence_factor: 0.8   # Used for calculating the adaptive prominence (std * factor)
+      min_peak_distance: 20
+      prominence: 10
 
 # Visualization (placeholder)
 visualization:

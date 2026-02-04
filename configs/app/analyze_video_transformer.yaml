@@ -18,42 +18,22 @@ output:
 
 # Keypoint detector
 pose_detector:
-  type: "rtmlib"
-  #config_path: "configs/detectors/rtmlib.yaml" - does not exist yet, will do when merging the full project
+  config_path: "configs/detectors/rtmlib_config.yaml"
 
 # Gait event detection
 event_detector:
   #"NeuralNet" or "Heuristic"
-  method: "Heuristic"
+  method: "NeuralNet"
 
   # NeuralNet configuration
   neural_net:
-    experiment_path: "experiments/LSTM_Baseline_Halpe"  # Name of the experiment folder
+    experiment_path: "experiments/Transformer_RTMLIB"   # Name of the experiment folder
     checkpoint: "best_model.pth"                        # Name of the checkpoint file (stays the same)
 
     post_processing:
       threshold: 0.4            # Gait event minimal confidence threshold
       min_distance_sec: 0.25    # Minimal time distance (in seconds) of subsequent gait events of the same type (duplicate detections)
 
-  # Heuristic configuration
-  heuristic:
-    method: "Bonci"
-    skeleton: "HALPE"
-
-    # Method specific parameters
-    params:
-      hs_velocity_factor: 0.5 # Walking speed factor for velocity thresholding
-      to_velocity_factor: 0.8
-      search_window_size: 10 # px - window to search for local maximum velocity (TO)
-
-      # Butterworth filter parameters for smoothing data during velocity calculation
-      velocity_filter_cutoff: 4.0
-      velocity_filter_order: 6
-
-      # Zeni et al. detector parameters - used as a baseline
-      zeni_params:
-        min_peak_distance: 20
-        prominence: 10
 
 # Visualization (placeholder)
 visualization:
