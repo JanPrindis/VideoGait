@@ -1,0 +1,18 @@
+type: "AlphaPose"
+
+params:
+  # Model configuration file (detectors/alphapose/configs/)
+  config_file: "halpe_136/resnet/256x192_res152_lr1e-3_1x-duc.yaml"
+
+  # Model weights (detectors/alphapose/pretrained_models/)
+  checkpoint_file: "halpe136_fast152_duc_regression_256x192.pth"
+
+  # Batch sizes
+  detbatch: 5       # Batch size for detector (YOLO)
+  posebatch: 64     # Batch size for pose estimator
+
+  # GPU ID (string "0" or "0,1" for multi-gpu)
+  gpus: "0"
+
+  # Minimal height of bounding box for detection (px)
+  min_bbox_size: 250
