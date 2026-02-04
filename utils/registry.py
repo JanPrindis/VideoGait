@@ -52,4 +52,7 @@ class Registry:
             raise KeyError(f"'{name}' is not registered in {self._name}")
         return self._module_dict[name]
 
+
 MODELS = Registry("models")
+HEURISTICS = Registry("heuristics")
+POSE_DETECTORS = Registry("pose_detectors")

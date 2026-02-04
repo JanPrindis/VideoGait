@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-from gaitDetectNN.utils.registry import MODELS
+from utils.registry import MODELS
 
 @MODELS.register
 class GaitBiLSTM(nn.Module):

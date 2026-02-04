@@ -1,10 +1,7 @@
 import sys
 import os
 import yaml
-import argparse
-import numpy as np
-import matplotlib.pyplot as plt
-from typing import Union, Dict, Any, List
+from typing import Union, Dict, Any
 
 # --- PATH SETUP ---
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -13,7 +10,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
 # --- IMPORTS ---
-from gaitDetectHeuristic.utils.builder import build_heuristic_detector
+from gaitDetectHeuristic.builder import build_heuristic_detector
 
 
 def run_heuristic_inference(

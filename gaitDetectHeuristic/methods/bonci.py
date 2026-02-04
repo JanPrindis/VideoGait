@@ -2,7 +2,7 @@ import copy
 import os
 
 import numpy as np
-from ..utils.registry import HEURISTICS
+from utils.registry import HEURISTICS
 from ..base import BaseHeuristicDetector
 from gaitStructs import GaitEvent, GaitEventType
 from .zeni import Zeni

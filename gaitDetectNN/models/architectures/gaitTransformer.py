@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import math
-from gaitDetectNN.utils.registry import MODELS
+from utils.registry import MODELS
 
 import warnings
 warnings.filterwarnings(

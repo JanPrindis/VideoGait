@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 import scipy.signal as signal
-from ..utils.registry import HEURISTICS
+from utils.registry import HEURISTICS
 from ..base import BaseHeuristicDetector
 from gaitStructs import GaitEvent, GaitEventType
 from utils.data import find_minima_maxima, butterworth_filter

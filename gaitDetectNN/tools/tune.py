@@ -16,8 +16,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
-import gaitDetectNN.models
-from gaitDetectNN.utils.builder import build_model
+from gaitDetectNN.builder import build_model
 from gaitDetectNN.engine.trainer import Trainer
 from dataset import GaitDataset
 from collate import collate_pad

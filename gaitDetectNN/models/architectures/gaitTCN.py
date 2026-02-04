@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.nn.utils.parametrizations import weight_norm
-from gaitDetectNN.utils.registry import MODELS
+from utils.registry import MODELS
 
 
 class TemporalBlock(nn.Module):

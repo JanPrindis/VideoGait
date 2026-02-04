@@ -16,8 +16,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
 # --- IMPORTS ---
-import gaitDetectNN.models
-from gaitDetectNN.utils.builder import build_model
+from gaitDetectNN.builder import build_model
 from gaitDetectNN.engine.predictor import Predictor
 
 from skeletons import get_skeleton_by_name

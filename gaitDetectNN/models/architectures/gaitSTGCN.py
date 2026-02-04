@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from gaitDetectNN.utils.registry import MODELS
+from utils.registry import MODELS
 from skeletons import get_skeleton_by_name
 
 
