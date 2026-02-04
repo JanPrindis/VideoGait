@@ -1,0 +1,25 @@
+type: "RTMLib"
+
+params:
+  # Paths to ONNX models (detectors/rtmlib/models)
+  det_model: "yolox_x.onnx"
+  pose_model: "rtmpose_x.onnx"
+
+  # Input resolution (must match ONNX model specification!)
+  det_input_size: [640, 640]
+  pose_input_size: [288, 384]
+
+  # Hardware setup
+  device: "cuda"          # "cuda" (NVIDIA), "cpu", "mps" (Mac)
+  backend: "onnxruntime"  # "onnxruntime" (recommended), "openvino", "opencv"
+
+  # Skeleton format
+  # False = COCO
+  # True = OpenPose
+  openpose_skeleton: False # Current implementation only supports COCO
+
+  # Tracking
+  tracking: True
+
+  # Minimal height of bounding box for detection (px)
+  min_bbox_size: 250
