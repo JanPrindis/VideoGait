@@ -1,6 +1,6 @@
-from .registry import HEURISTICS
+from utils.registry import HEURISTICS
 
-from .. import methods
+from gaitDetectHeuristic import methods
 
 def build_heuristic_detector(full_config):
     heuristic_cfg = full_config.get('event_detector', {}).get('heuristic', {})

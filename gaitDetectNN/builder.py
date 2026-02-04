@@ -5,7 +5,7 @@ It leverages the model registry to dynamically instantiate classes based on stri
 defined in the configuration.
 """
 import torch
-from gaitDetectNN.utils.registry import MODELS
+from utils.registry import MODELS
 
 def build_model(cfg, input_size):
     """
