@@ -1,0 +1,12 @@
+type: "PoseLandmarker"
+
+params:
+  # Model file (detectors/google_mediapipe/models/)
+  model_name: "pose_landmarker_heavy.task"
+
+  min_conf: 0.5      # Detection confidence
+  min_presence: 0.5  # Presence confidence
+  min_tracking: 0.5  # Tracking confidence
+
+  # Minimal height of bounding box for detection (px)
+  min_bbox_size: 250
