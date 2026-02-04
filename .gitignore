@@ -3,7 +3,6 @@
 
 videos/*
 results/*
-models/*
 
 dataset/**/*.mov
 dataset/**/*.mp4
