@@ -4,7 +4,7 @@ import numpy as np
 from scipy.interpolate import CubicSpline
 from scipy.signal import find_peaks, butter, filtfilt
 
-from utils.jsonSerializer import KeypointSerializer
+from utils.json_serializer import KeypointSerializer
 
 
 def create_folder_if_not_exists(folder_path):

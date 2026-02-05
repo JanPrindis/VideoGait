@@ -176,15 +176,14 @@ def interpolate_minterpolate(input_video, output_video, target_fps=120):
         'ffmpeg',
         '-i', input_video,
         '-vf', f'minterpolate=fps={target_fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir',
-        '-c:v', 'libx264',      # Or your preferred codec
-        '-crf', '18',           # Adjust CRF for quality (lower is better)
-        '-preset', 'slow',      # Adjust preset for speed/quality tradeoff
+        '-c:v', 'libx264',
+        '-crf', '18',
+        '-preset', 'slow',
         output_video
     ]
 
     try:
         subprocess.run(command, check=True, capture_output=True, text=True)
-        print(f"Successfully interpolated {input_video} to {output_video}")
     except subprocess.CalledProcessError as e:
         print(f"Error interpolating {input_video}:")
         print(e.stderr)

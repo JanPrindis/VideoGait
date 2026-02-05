@@ -3,7 +3,7 @@ import cv2
 
 from rich.progress import Progress, BarColumn, MofNCompleteColumn, TimeRemainingColumn, TextColumn, TimeElapsedColumn
 from Skeletons.skeletons import SkeletonDefinition
-from utils.jsonSerializer import KeypointSerializer
+from utils.json_serializer import KeypointSerializer
 
 class Visualizer:
     def __init__(self, skeleton_definition: SkeletonDefinition):

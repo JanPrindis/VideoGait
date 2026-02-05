@@ -18,8 +18,7 @@ if PROJECT_ROOT not in sys.path:
 
 from gaitDetectNN.builder import build_model
 from gaitDetectNN.engine.trainer import Trainer
-from dataset import GaitDataset
-from collate import collate_pad
+from loaders import GaitDataset, collate_pad
 from utils.preprocessing import generate_features
 from utils.data import find_matching_annotation
 from skeletons import get_skeleton_by_name

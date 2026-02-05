@@ -2,7 +2,7 @@ import json
 import os
 from dataclasses import asdict
 
-from gaitStructs import GaitEvent, GaitEventType
+from utils.gait_structs import GaitEvent, GaitEventType
 
 
 class KeypointSerializer:

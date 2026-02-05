@@ -6,9 +6,9 @@ from tqdm import tqdm
 import subprocess
 
 from skeletons.halpe_skeleton import HALPE_SKELETON
-from rtmlib.infer import RTMLib
-from interpolate import RIFE_interpolate
-from utils.jsonSerializer import AnnotationSerializer
+from detectors.rtmlib.wrapper import RTMLib
+from utils.video_processing import RIFE_interpolate
+from utils.json_serializer import AnnotationSerializer
 from utils.visualizer import Visualizer
 
 _is_nvenc_available = None
@@ -334,8 +334,8 @@ def recalculate_annotations(annotations_root_path):
 
 
 if __name__ == "__main__":
-    annotations_root_path = "./annotations"
-    dataset_root_path = "./dataset"
+    annotations_root_path = "../annotations"
+    dataset_root_path = "../dataset"
     blacklist = [
         "002_NM_01.MOV", # Bad crop
         "004_NM_01.MOV", # Bad crop

@@ -22,7 +22,7 @@ from gaitDetectNN.engine.predictor import Predictor
 from skeletons import get_skeleton_by_name
 from utils.preprocessing import generate_features
 
-from gaitStructs import GaitEvent, GaitEventType
+from utils.gait_structs import GaitEvent, GaitEventType
 
 EVENT_ORDER = ["Left Heel Strike", "Left Toe Off", "Right Heel Strike", "Right Toe Off"]
 
@@ -416,8 +416,8 @@ if __name__ == "__main__":
         data = run_nn_inference(config, input_path, output_dir)
         print(f"Testing {net}...")
 
-        from gaitStructs import build_phases_from_events
-        from visualizeGaitPhases import visualize_gait_phases, print_statistics
+        from utils.gait_structs import build_phases_from_events
+        from tools.debug_viz import visualize_gait_phases, print_statistics
 
         l_phases, r_phases, support_phases = build_phases_from_events(
             data["events"],

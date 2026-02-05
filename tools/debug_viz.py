@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch
 
-from gaitStructs import PhaseType, SupportType, Leg
+from utils.gait_structs import PhaseType, SupportType, Leg
 
 
 def print_statistics(left_phases, right_phases, support_phases):

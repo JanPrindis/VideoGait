@@ -4,8 +4,8 @@ from tkinter import filedialog
 import cv2
 import os
 
-from gaitStructs import GaitEvent, GaitEventType
-from utils.jsonSerializer import AnnotationSerializer
+from utils.gait_structs import GaitEvent, GaitEventType
+from utils.json_serializer import AnnotationSerializer
 
 
 class GaitAnnotator:

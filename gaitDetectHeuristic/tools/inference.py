@@ -102,8 +102,8 @@ if __name__ == "__main__":
         print(f"Testing done: {method}")
 
         if visualize:
-            from gaitStructs import build_phases_from_events
-            from visualizeGaitPhases import visualize_gait_phases, print_statistics
+            from utils.gait_structs import build_phases_from_events
+            from tools.debug_viz import visualize_gait_phases, print_statistics
 
             l_phases, r_phases, support_phases = build_phases_from_events(
                 data["events"],

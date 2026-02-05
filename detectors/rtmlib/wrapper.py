@@ -11,7 +11,7 @@ from pathlib import Path
 
 from detectors import POSE_DETECTORS
 from detectors.base import BaseDetector
-from utils.jsonSerializer import KeypointSerializer
+from utils.json_serializer import KeypointSerializer
 from .tools import PoseTracker, Custom
 
 

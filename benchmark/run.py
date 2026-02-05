@@ -13,14 +13,13 @@ if script_dir in sys.path:
     sys.path.remove(script_dir)
 
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import seaborn as sns
 import yaml
 
-from utils.jsonSerializer import AnnotationSerializer
-from gaitStructs import GaitEventType
+from utils.json_serializer import AnnotationSerializer
+from utils.gait_structs import GaitEventType
 
 from benchmark.utils.data_manager import get_benchmark_files
 from benchmark.engine.matcher import match_events_greedy

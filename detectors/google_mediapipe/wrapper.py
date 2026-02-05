@@ -5,7 +5,7 @@ from pathlib import Path
 
 from detectors import POSE_DETECTORS
 from ..base import BaseDetector
-from utils.jsonSerializer import KeypointSerializer
+from utils.json_serializer import KeypointSerializer
 
 
 @POSE_DETECTORS.register

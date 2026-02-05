@@ -1,3 +1,10 @@
+"""
+This module initializes the heuristics registry by dynamically importing all heuristic methods.
+
+It scans the directory containing this file and imports all Python modules found.
+This ensures that all model classes decorated with @HEURISTICS.register are
+automatically added to the registry when this package is imported.
+"""
 import os
 import importlib
 
