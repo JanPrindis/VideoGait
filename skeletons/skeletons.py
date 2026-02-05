@@ -1,12 +1,19 @@
-from dataclasses import dataclass
-from typing import Dict, Tuple, Union, Type, List
+from dataclasses import dataclass, field
+from typing import Dict, Tuple, Union, Type, List, Set
 from enum import IntEnum
+
+class SkeletonSide(IntEnum):
+    CENTER = 0
+    LEFT = 1
+    RIGHT = 2
 
 @dataclass
 class SkeletonDefinition:
     keypoints: Type[IntEnum]
     links: Dict[str, Tuple[Union[int, IntEnum], Union[int, IntEnum]]]
-    colors: Dict[str, Tuple[int, int, int]]
+
+    left_keypoints: Set[int] = field(default_factory=set)
+    right_keypoints: Set[int] = field(default_factory=set)
 
     def get_adjacency_list(self, active_keypoints: List[str]) -> List[Tuple[int, int]]:
 
@@ -38,3 +45,34 @@ class SkeletonDefinition:
                         adj_list.append(pair)
 
         return adj_list
+
+    def get_keypoint_side(self, kp_idx: int) -> SkeletonSide:
+        if kp_idx in self.left_keypoints:
+            return SkeletonSide.LEFT
+
+        if kp_idx in self.right_keypoints:
+            return SkeletonSide.RIGHT
+
+        return SkeletonSide.CENTER
+
+    def get_link_side(self, kp1_val: int, kp2_val: int) -> SkeletonSide:
+        is_k1_left = kp1_val in self.left_keypoints
+        is_k2_left = kp2_val in self.left_keypoints
+
+        is_k1_right = kp1_val in self.right_keypoints
+        is_k2_right = kp2_val in self.right_keypoints
+
+        # (L-R) -> Center Color
+        if (is_k1_left and is_k2_right) or (is_k1_right and is_k2_left):
+            return SkeletonSide.CENTER
+
+        # (L-L or L-C) -> Side Color (Left)
+        if (is_k1_left or is_k2_left) and not (is_k1_right or is_k2_right):
+            return SkeletonSide.LEFT
+
+        # (R-R or R-C) -> Side Color (Right)
+        if (is_k1_right or is_k2_right) and not (is_k1_left or is_k2_left):
+            return SkeletonSide.RIGHT
+
+        # (C-C) -> Center Color
+        return SkeletonSide.CENTER

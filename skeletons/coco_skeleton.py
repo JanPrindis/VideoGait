@@ -20,7 +20,6 @@ class CocoKeypoints(IntEnum):
     LEFT_ANKLE = 15
     RIGHT_ANKLE = 16
 
-
 __COCO_NAMED_SKELETON = {
     "left_upper_leg": (CocoKeypoints.LEFT_HIP, CocoKeypoints.LEFT_KNEE),
     "left_lower_leg": (CocoKeypoints.LEFT_KNEE, CocoKeypoints.LEFT_ANKLE),
@@ -44,17 +43,19 @@ __COCO_NAMED_SKELETON = {
     "right_eye_to_ear": (CocoKeypoints.RIGHT_EYE, CocoKeypoints.RIGHT_EAR),
 }
 
-
-__COCO_COLORS = {
-    "left_side_keypoint": (255, 128, 0),
-    "right_side_keypoint": (0, 128, 255),
-    "left_side_link": (255, 255, 255),
-    "right_side_link": (255, 255, 255)
+__COCO_LEFT = {
+    CocoKeypoints.LEFT_EYE, CocoKeypoints.LEFT_EAR, CocoKeypoints.LEFT_SHOULDER, CocoKeypoints.LEFT_ELBOW,
+    CocoKeypoints.LEFT_WRIST, CocoKeypoints.LEFT_HIP, CocoKeypoints.LEFT_KNEE, CocoKeypoints.LEFT_ANKLE
 }
 
+__COCO_RIGHT = {
+    CocoKeypoints.RIGHT_EYE, CocoKeypoints.RIGHT_EAR, CocoKeypoints.RIGHT_SHOULDER, CocoKeypoints.RIGHT_ELBOW,
+    CocoKeypoints.RIGHT_WRIST, CocoKeypoints.RIGHT_HIP, CocoKeypoints.RIGHT_KNEE, CocoKeypoints.RIGHT_ANKLE
+}
 
 COCO_SKELETON = SkeletonDefinition(
     keypoints=CocoKeypoints,
     links=__COCO_NAMED_SKELETON,
-    colors=__COCO_COLORS
+    left_keypoints=__COCO_LEFT,
+    right_keypoints=__COCO_RIGHT
 )

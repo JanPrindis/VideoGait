@@ -67,15 +67,23 @@ __HALPE_SKELETON = {
     "right_shoulder_to_ear": (HalpeKeypoints.RIGHT_SHOULDER, HalpeKeypoints.RIGHT_EAR),
 }
 
-__HALPE_COLORS = {
-    "left_side_keypoint": (255, 128, 0),
-    "right_side_keypoint": (0, 128, 255),
-    "left_side_link": (255, 255, 255),
-    "right_side_link": (255, 255, 255)
+__HALPE_LEFT = {
+    HalpeKeypoints.LEFT_EYE, HalpeKeypoints.LEFT_EAR,
+    HalpeKeypoints.LEFT_SHOULDER, HalpeKeypoints.LEFT_ELBOW, HalpeKeypoints.LEFT_WRIST,
+    HalpeKeypoints.LEFT_HIP, HalpeKeypoints.LEFT_KNEE, HalpeKeypoints.LEFT_ANKLE,
+    HalpeKeypoints.LEFT_FOOT_INDEX, HalpeKeypoints.LEFT_FOOT_PINKY, HalpeKeypoints.LEFT_HEEL
+}
+
+__HALPE_RIGHT = {
+    HalpeKeypoints.RIGHT_EYE, HalpeKeypoints.RIGHT_EAR,
+    HalpeKeypoints.RIGHT_SHOULDER, HalpeKeypoints.RIGHT_ELBOW, HalpeKeypoints.RIGHT_WRIST,
+    HalpeKeypoints.RIGHT_HIP, HalpeKeypoints.RIGHT_KNEE, HalpeKeypoints.RIGHT_ANKLE,
+    HalpeKeypoints.RIGHT_FOOT_INDEX, HalpeKeypoints.RIGHT_FOOT_PINKY, HalpeKeypoints.RIGHT_HEEL
 }
 
 HALPE_SKELETON = SkeletonDefinition(
     keypoints=HalpeKeypoints,
     links=__HALPE_SKELETON,
-    colors=__HALPE_COLORS
+    left_keypoints=__HALPE_LEFT,
+    right_keypoints=__HALPE_RIGHT
 )

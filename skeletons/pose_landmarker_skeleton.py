@@ -36,7 +36,6 @@ class PoseLandmarkerKeypoints(IntEnum):
     LEFT_FOOT_INDEX = 31
     RIGHT_FOOT_INDEX = 32
 
-
 __POSE_LANDMARKER_SKELETON = {
     "left_upper_leg": (PoseLandmarkerKeypoints.LEFT_HIP, PoseLandmarkerKeypoints.LEFT_KNEE),
     "left_lower_leg": (PoseLandmarkerKeypoints.LEFT_KNEE, PoseLandmarkerKeypoints.LEFT_ANKLE),
@@ -75,15 +74,25 @@ __POSE_LANDMARKER_SKELETON = {
     "right_shoulder_to_ear": (PoseLandmarkerKeypoints.RIGHT_SHOULDER, PoseLandmarkerKeypoints.RIGHT_EAR),
 }
 
-__POSE_LANDMARKER_COLORS = {
-    "left_side_keypoint": (255, 128, 0),
-    "right_side_keypoint": (0, 128, 255),
-    "left_side_link": (255, 255, 255),
-    "right_side_link": (255, 255, 255)
+__POSE_LANDMARKER_LEFT = {
+    PoseLandmarkerKeypoints.LEFT_EYE_IN, PoseLandmarkerKeypoints.LEFT_EYE_OUT, PoseLandmarkerKeypoints.LEFT_EAR,
+    PoseLandmarkerKeypoints.MOUTH_L, PoseLandmarkerKeypoints.LEFT_SHOULDER, PoseLandmarkerKeypoints.LEFT_ELBOW,
+    PoseLandmarkerKeypoints.LEFT_WRIST, PoseLandmarkerKeypoints.LEFT_PINKY, PoseLandmarkerKeypoints.LEFT_INDEX,
+    PoseLandmarkerKeypoints.LEFT_THUMB, PoseLandmarkerKeypoints.LEFT_HIP, PoseLandmarkerKeypoints.LEFT_KNEE,
+    PoseLandmarkerKeypoints.LEFT_ANKLE, PoseLandmarkerKeypoints.LEFT_HEEL, PoseLandmarkerKeypoints.LEFT_FOOT_INDEX
+}
+
+__POSE_LANDMARKER_RIGHT = {
+    PoseLandmarkerKeypoints.RIGHT_EYE_IN, PoseLandmarkerKeypoints.RIGHT_EYE_OUT, PoseLandmarkerKeypoints.RIGHT_EAR,
+    PoseLandmarkerKeypoints.MOUTH_R, PoseLandmarkerKeypoints.RIGHT_SHOULDER, PoseLandmarkerKeypoints.RIGHT_ELBOW,
+    PoseLandmarkerKeypoints.RIGHT_WRIST, PoseLandmarkerKeypoints.RIGHT_PINKY, PoseLandmarkerKeypoints.RIGHT_INDEX,
+    PoseLandmarkerKeypoints.RIGHT_THUMB, PoseLandmarkerKeypoints.RIGHT_HIP, PoseLandmarkerKeypoints.RIGHT_KNEE,
+    PoseLandmarkerKeypoints.RIGHT_ANKLE, PoseLandmarkerKeypoints.RIGHT_HEEL, PoseLandmarkerKeypoints.RIGHT_FOOT_INDEX
 }
 
 POSE_LANDMARKER_SKELETON = SkeletonDefinition(
     keypoints=PoseLandmarkerKeypoints,
     links=__POSE_LANDMARKER_SKELETON,
-    colors=__POSE_LANDMARKER_COLORS
+    left_keypoints=__POSE_LANDMARKER_LEFT,
+    right_keypoints=__POSE_LANDMARKER_RIGHT
 )
