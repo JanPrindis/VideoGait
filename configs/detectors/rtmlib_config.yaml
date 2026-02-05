@@ -14,12 +14,12 @@ params:
   backend: "onnxruntime"  # "onnxruntime" (recommended), "openvino", "opencv"
 
   # Skeleton format
-  # False = COCO
+  # False = COCO/HALPE
   # True = OpenPose
-  openpose_skeleton: False # Current implementation only supports COCO
+  openpose_skeleton: False # Current implementation only supports COCO/HALPE
 
   # Tracking
   tracking: True
 
   # Minimal height of bounding box for detection (px)
-  min_bbox_size: 250
+  min_bbox_size: 500
