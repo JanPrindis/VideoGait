@@ -6,6 +6,7 @@ defined in the configuration.
 """
 import torch
 from utils.registry import MODELS
+import gaitDetectNN.models
 
 def build_model(cfg, input_size):
     """
