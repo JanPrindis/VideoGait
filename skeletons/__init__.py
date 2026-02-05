@@ -1,8 +1,9 @@
 """
-This module serves as a registry for supported skeleton definitions.
+This module initializes the skeleton registry by dynamically importing all skeleton definitions.
 
-It imports specific skeleton configurations (like HALPE, COCO, POSE_LANDMARKER)
-and provides a unified interface to retrieve them by name.
+It scans the directory containing this file and imports all Python modules found.
+It inspects each module for instances of `SkeletonDefinition` and registers them.
+This allows new skeletons to be added simply by creating a new file in this directory.
 """
 import os
 import pkgutil
