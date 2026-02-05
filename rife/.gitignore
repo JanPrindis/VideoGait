@@ -3,7 +3,7 @@
 *.py#
 
 *.pkl
-train_log/*.py
+train_log/*.pkl
 *.mp4
 
 test/
