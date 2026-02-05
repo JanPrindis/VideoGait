@@ -14,23 +14,24 @@ _SKELETON_REGISTRY = {}
 
 
 def _discover_and_register_skeletons():
-    package_path = os.path.dirname(__file__)
+    package_path = os.path.dirname(os.path.abspath(__file__))
     package_name = __name__
+
+    # print(f"[DEBUG] Scanning for skeletons in: {package_path}")
 
     # Iterate over all modules in the package
     for _, module_name, _ in pkgutil.iter_modules([package_path]):
-        # Skip init file and base skeleton definition (skeletons.py),
-        if module_name == "skeletons":
-            continue
+        # print(f"[SkeletonRegistry] Loading {module_name}")
 
+        # Skip init file and base skeleton definition (skeletons.py),
+        if module_name == "skeletons" or module_name.startswith("__"):
+            continue
         try:
             # Dynamic module import
-            full_module_name = f"{package_name}.{module_name}"
-            module = importlib.import_module(full_module_name)
+            module = importlib.import_module(f".{module_name}", package=package_name)
 
             # Integrate over all members in the module
             for name, value in inspect.getmembers(module):
-
                 # Filter out only SkeletonDefinition classes
                 if isinstance(value, SkeletonDefinition):
                     # Key logic: HALPE_SKELETON -> HALPE
@@ -38,11 +39,11 @@ def _discover_and_register_skeletons():
                     key_name = name.upper().replace("_SKELETON", "")
 
                     _SKELETON_REGISTRY[key_name] = value
-                    # print(f"[SkeletonRegistry] Loaded '{key_name}' from {module_name}")
 
         except Exception as e:
             print(f"[SkeletonRegistry] Error loading module {module_name}: {e}")
 
+_discover_and_register_skeletons()
 
 def get_skeleton_by_name(name: str):
     """
