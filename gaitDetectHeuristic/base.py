@@ -68,15 +68,15 @@ class BaseHeuristicDetector(ABC):
                    - global_offset: Frame offset from the start of the video.
         """
         # Try to get center HIP keypoints
-        raw_data, valid_indices = get_keypoints(json_path, self.skeleton, ["HIP"], self.confidence_threshold)
-        global_offset = valid_indices[0] if valid_indices else 0
+        raw_data, valid_indices, first_frame_offset = get_keypoints(json_path, self.skeleton, ["HIP"], self.confidence_threshold)
+        global_offset = valid_indices[0] + first_frame_offset if valid_indices else 0
 
         if raw_data and "HIP" in raw_data and len(raw_data["HIP"]) > 0:
             return raw_data["HIP"], False, global_offset
 
         # Fallback - Average center hip from both sides
         try:
-            raw_lr, _ = get_keypoints(json_path, self.skeleton, ["LEFT_HIP", "RIGHT_HIP"], self.confidence_threshold)
+            raw_lr, _, _ = get_keypoints(json_path, self.skeleton, ["LEFT_HIP", "RIGHT_HIP"], self.confidence_threshold)
         except ValueError:
             return None, False, 0
 
@@ -169,7 +169,7 @@ class BaseHeuristicDetector(ABC):
         keys_to_fetch = [k for k in required_keypoints if not (k == "HIP" and is_virtual_hip)]
 
         # Get raw data
-        raw_kps, _ = get_keypoints(json_path, self.skeleton, keys_to_fetch, self.confidence_threshold)
+        raw_kps, _, _ = get_keypoints(json_path, self.skeleton, keys_to_fetch, self.confidence_threshold)
 
         if is_virtual_hip and "HIP" in required_keypoints:
             raw_kps["HIP"] = hip_data

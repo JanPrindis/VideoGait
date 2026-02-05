@@ -224,36 +224,91 @@ def find_minima_maxima(data, distance=20, prominence=None, rel_prominence=0.3):
 
 
 def get_keypoints(keypoint_json_path, skeleton_definition, items_to_get, confidence_threshold=0.5):
+    """
+    Loads keypoints from JSON using Sparse Parsing to maintain temporal consistency.
+    Respects 'image_id' to place frames at correct indices, handling missing frames (gaps) as None.
+    """
 
     def get_specific_keypoint(keypoint_list, index):
         return keypoint_list[index * 3], keypoint_list[index * 3 + 1], keypoint_list[index * 3 + 2]
 
-    json = KeypointSerializer.load(keypoint_json_path)
-    total_frames = len(json)
+    json_data = KeypointSerializer.load(keypoint_json_path)
 
-    valid_indices = []
-    extracted_keypoints = {item: [(None, None, None)] * total_frames for item in items_to_get}
+    if not json_data:
+        return {}, [], 0
 
-    # Extract specified keypoints
-    for i, frame_data in enumerate(json):
-        # Check if any keypoint is under the confidence threshold
-        if any([conf < confidence_threshold for conf in frame_data["keypoints"][2::3]]):
+    # Get range of image_id
+    frame_map = {}
+    min_id = float('inf')
+    max_id = float('-inf')
+
+    valid_frames_in_json = []
+
+    for entry in json_data:
+        try:
+            # Expected format: "123.jpg" or just "123"
+            fid = int(entry['image_id'].split('.')[0])
+            frame_map[fid] = entry
+
+            if fid < min_id: min_id = fid
+            if fid > max_id: max_id = fid
+
+            valid_frames_in_json.append(fid)
+
+        except (ValueError, IndexError):
             continue
 
-        valid_indices.append(i)
-        keypoints = frame_data["keypoints"]
+    if not frame_map:
+        return {}, [], 0
+
+    # Full duration from first detected frame to last
+    total_duration = max_id - min_id + 1
+
+    # Sparse array initialization
+    extracted_keypoints = {item: [(None, None, None)] * total_duration for item in items_to_get}
+
+    # Helper for mapping absolute values to array idx
+    valid_indices_relative = []
+
+    sorted_fids = sorted(valid_frames_in_json)
+
+    for fid in sorted_fids:
+        frame_data = frame_map[fid]
+        rel_idx = fid - min_id  # 0-based index relative to the start of this clip
+
+        # Check confidence
+        kps_raw = frame_data["keypoints"]
+        scores = kps_raw[2::3]
+
+        is_valid_frame = any(conf >= confidence_threshold for conf in scores)
+        if is_valid_frame:
+            valid_indices_relative.append(rel_idx)
+
+        # Extract keypoints
         for item in items_to_get:
             try:
-                extracted_keypoints[item][i] = get_specific_keypoint(keypoints, skeleton_definition.keypoints[item])
+                extracted_keypoints[item][rel_idx] = get_specific_keypoint(kps_raw, skeleton_definition.keypoints[item])
             except KeyError:
-                # if skeleton_definition does not contain the requested keypoint, it will be (None, None, None)
                 pass
+
+    if not valid_indices_relative:
+        return {}, [], min_id
+
+    # Trimming
+    start_cut = valid_indices_relative[0]
+    end_cut = valid_indices_relative[-1]
 
     trimmed_keypoints = {}
     for item in items_to_get:
-        trimmed_keypoints[item] = trim(extracted_keypoints[item], valid_indices[0], valid_indices[-1])
+        trimmed_keypoints[item] = trim(extracted_keypoints[item], start_cut, end_cut)
 
-    return trimmed_keypoints, valid_indices
+    # Offset calculation
+    final_valid_indices = [i - start_cut for i in valid_indices_relative]
+
+    # Final global offset = (first ID in JSON) + (how much was cut off because of low confidence)
+    final_first_frame_offset = min_id + start_cut
+
+    return trimmed_keypoints, final_valid_indices, final_first_frame_offset
 
 
 def average_with_nones(list1, list2):

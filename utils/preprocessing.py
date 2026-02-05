@@ -190,17 +190,20 @@ def create_clips(normalized_keypoints: dict, original_keypoints: dict, valid_ran
     """
     clips = []
     for start, end in valid_ranges:
-        # Determine walking direction from the original, unfiltered hip movement.
-        # We use original data to get a clear start/end signal without filter artifacts.
-        hip_start_x = original_keypoints["HIP"][start][0]
-        hip_end_x = original_keypoints["HIP"][end][0]
+        # Determine walking direction from the original, unfiltered hip movement
+        # We use original data to get a clear start/end signal without filter artifacts
+        hip_start_kp = original_keypoints["HIP"][start]
+        hip_end_kp = original_keypoints["HIP"][end]
 
         # If start or end is None, we can't determine direction, so we skip.
-        if hip_start_x is None or hip_end_x is None:
+        if hip_start_kp is None or hip_end_kp is None:
             continue
 
-        # Assume we want all clips to look like the person is walking to the right.
-        # If x at the end is less than x at the start, the person was walking left.
+        hip_start_x = hip_start_kp[0]
+        hip_end_x = hip_end_kp[0]
+
+        # Assume we want all clips to look like the person is walking to the right
+        # If x at the end is less than x at the start, the person was walking left
         should_mirror = hip_end_x < hip_start_x
 
         # Create the clip by slicing the normalized data
@@ -210,8 +213,8 @@ def create_clips(normalized_keypoints: dict, original_keypoints: dict, valid_ran
 
         if should_mirror:
             for name, coords_list in clip_data.items():
-                # Mirror the x-axis by negating the x-coordinate.
-                # The y-coordinate and confidence remain unchanged.
+                # Mirror the x-axis by negating the x-coordinate
+                # The y-coordinate and confidence remain unchanged
                 clip_data[name] = [(-x, y, conf) if x is not None else (None, None, None)
                                    for x, y, conf in coords_list]
 
@@ -237,16 +240,16 @@ def create_processed_clips(
     has_annotations = annotations_path and os.path.exists(annotations_path)
 
     if has_annotations:
-        # If annotations exist, they are the source of truth for FPS.
+        # If annotations exist, they are the source of truth for FPS
         determined_frame_rate = AnnotationSerializer.load(annotations_path)["metadata"]["fps"]
     elif frame_rate is not None:
-        # If no annotations, use the manually provided frame rate.
+        # If no annotations, use the manually provided frame rate
         determined_frame_rate = frame_rate
     else:
-        # If neither is available, we cannot proceed.
+        # If neither is available, we cannot proceed
         raise ValueError("`frame_rate` must be provided when `annotations_path` is not specified.")
 
-    # Disable label creation if we don't have annotations to create them from.
+    # Disable label creation if we don't have annotations to create them from
     if not has_annotations:
         create_labels = False
 
@@ -257,7 +260,7 @@ def create_processed_clips(
     # Combine user-requested keypoints with essential ones, ensuring no duplicates
     all_required_keypoints = list(set(required_keypoints) | essential_keypoints)
 
-    keypoints, valid_indices = get_keypoints(
+    keypoints, valid_indices, first_frame_offset = get_keypoints(
         keypoint_json_path=keypoints_path,
         skeleton_definition=skeleton_definition,
         items_to_get=all_required_keypoints,
@@ -269,13 +272,13 @@ def create_processed_clips(
         return [], [], [], determined_frame_rate
 
     # If the "HIP" keypoint data is all None, calculate it by averaging
-    if all(coord[0] is None for coord in keypoints["HIP"]):
+    if all(coord is None or coord[0] is None for coord in keypoints["HIP"]):
         lh = keypoints["LEFT_HIP"]
         rh = keypoints["RIGHT_HIP"]
         keypoints["HIP"] = average_with_nones(lh, rh)
 
     # If the "NECK" keypoint data is all None, calculate it by averaging
-    if all(coord[0] is None for coord in keypoints["NECK"]):
+    if all(coord is None or coord[0] is None for coord in keypoints["NECK"]):
         ls = keypoints["LEFT_SHOULDER"]
         rs = keypoints["RIGHT_SHOULDER"]
         keypoints["NECK"] = average_with_nones(ls, rs)
@@ -293,10 +296,14 @@ def create_processed_clips(
     keypoints = preprocess_keypoints(keypoints, determined_frame_rate, filter_cutoff, filter_order)
     normalized_keypoints = normalize_coords(keypoints)
 
+    hip_x_series = np.array(
+        [coord[0] if coord is not None else np.nan for coord in keypoints["HIP"]],
+        dtype=float
+    )
 
     # Identify and split into clips
     trimmed_valid_range = get_valid_range(
-        np.array([coord[0] for coord in keypoints["HIP"]]),
+        hip_x_series,
         determined_frame_rate,
         exclude_ratio,
         min_segment_length,
@@ -304,6 +311,7 @@ def create_processed_clips(
         filter_cutoff,
         filter_order
     )
+
     clips = create_clips(
         normalized_keypoints=normalized_keypoints,
         original_keypoints=original_keypoints_for_direction,
@@ -311,7 +319,7 @@ def create_processed_clips(
     )
 
     # Calculate global ranges that correspond to the original video's frame indices
-    global_valid_range = [(start + valid_indices[0], end + valid_indices[0]) for start, end in trimmed_valid_range]
+    global_valid_range = [(start + valid_indices[0] + first_frame_offset, end + valid_indices[0] + first_frame_offset) for start, end in trimmed_valid_range]
 
     # Optionally create labels
     all_labels = None
