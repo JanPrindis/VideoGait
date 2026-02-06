@@ -5,11 +5,10 @@ import numpy as np
 from pathlib import Path
 from typing import List, Tuple, Dict, Optional, Union
 
-import yaml
 from tqdm import tqdm
 
-from skeletons import get_skeleton_by_name
-from skeletons.skeletons import SkeletonDefinition, SkeletonSide
+from skeletons.skeletons import SkeletonSide
+from utils.config_utils import resolve_skeleton_from_config
 from utils.gait_structs import PhaseType, GaitEventType
 from utils.json_serializer import KeypointSerializer
 
@@ -18,7 +17,7 @@ class GaitVisualizer:
     def __init__(self, app_config):
         self.cfg = app_config
 
-        skel_name = self._resolve_skeleton_def()
+        skel_name = resolve_skeleton_from_config(app_config)
         self.skel = skel_name
 
         viz_cfg = self.cfg.get('visualization', {})
@@ -73,33 +72,6 @@ class GaitVisualizer:
             if any(x in n for x in ["KNEE", "ANKLE", "HIP", "HEEL", "FOOT", "TOE"]):
                 self.lower_body_ids.add(int(member))
 
-    def _resolve_skeleton_def(self) -> SkeletonDefinition:
-        detector_cfg = self.cfg.get('event_detector', {})
-        method = detector_cfg.get('method', 'Heuristic')
-        skel_name = "halpe"  # Fallback default
-
-        if method == 'Heuristic':
-            # event_detector -> heuristic -> skeleton
-            skel_name = detector_cfg.get('heuristic', {}).get('skeleton', 'halpe')
-
-        elif method == 'NeuralNet':
-            # event_detector -> neural_net -> experiment_path -> (load yaml) -> data -> skeleton
-            exp_path = detector_cfg.get('neural_net', {}).get('experiment_path', '')
-            nn_cfg_path = os.path.join(exp_path, 'config.yaml')
-
-            if os.path.exists(nn_cfg_path):
-                try:
-                    with open(nn_cfg_path, 'r') as f:
-                        nn_config = yaml.safe_load(f)
-                        skel_name = nn_config.get('data', {}).get('skeleton', 'halpe')
-                except Exception as e:
-                    print(f"[Visualizer] Error loading NN config at {nn_cfg_path}: {e}")
-            else:
-                print(f"[Visualizer] Warning: NN config not found at {nn_cfg_path}, using default.")
-
-        # Get skeleton from factory
-        return get_skeleton_by_name(skel_name)
-
     def _get_kp_idx(self, name: str) -> Optional[int]:
         if name in self.skel.keypoints.__members__:
             return int(self.skel.keypoints[name])
@@ -107,6 +79,16 @@ class GaitVisualizer:
 
     @staticmethod
     def _load_and_parse_json(json_path: str, video_total_frames: int) -> np.ndarray:
+        """
+        Loads keypoints from a JSON file and converts them to a numpy array.
+
+        Args:
+            json_path (str): Path to the keypoints JSON file.
+            video_total_frames (int): Total number of frames in the video (for array allocation).
+
+        Returns:
+            np.ndarray: Array of shape (frames, keypoints, 3) containing (x, y, conf).
+        """
         # Load JSON
         raw_data = KeypointSerializer.load(json_path)
 
