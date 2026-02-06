@@ -195,7 +195,7 @@ class GaitVisualizer:
         frame_idx = 0
         last_valid_clip_id = -1
 
-        with tqdm(total=total_frames, desc=f"[Viz] {vid_path.name}", unit="frame") as pbar:
+        with tqdm(total=total_frames, desc=f"[Visualizer] {vid_path.name}", unit="frame") as pbar:
             while cap.isOpened():
                 ret, frame = cap.read()
                 if not ret: break
@@ -238,12 +238,12 @@ class GaitVisualizer:
                                                       l_heel=l_heel, r_heel=r_heel,
                                                       l_toe=l_toe, r_toe=r_toe)
 
-                    self._draw_trails(canvas, trail_buffers)
-                    self._draw_footprints_render(canvas, footprints, frame_idx)
-
                     if kps is not None:
                         self._draw_com_drop(canvas, kps, self.kps_map['l_hip'], self.kps_map['r_hip'])
                         self._draw_skeleton(canvas, kps, color_mode='side', use_dimmed=not is_valid)
+
+                    self._draw_trails(canvas, trail_buffers)
+                    self._draw_footprints_render(canvas, footprints, frame_idx)
 
                     self._draw_info_box(canvas, frame_idx, total_frames, clip_info, is_valid, "Kinematics")
                     writers['kinematics'].write(canvas)
@@ -392,7 +392,7 @@ class GaitVisualizer:
             age = curr_frame - t
             if age < self.fp_duration:
                 # Calculate radius for fade-out effect
-                rad = int(8 * (1 - age / self.fp_duration))
+                rad = int(10 * (1 - age / self.fp_duration))
                 if rad > 0:
                     color = self.footprint_hs_col if f_type == 1 else self.footprint_to_col
 
@@ -427,9 +427,18 @@ class GaitVisualizer:
         status_col = (0, 255, 0) if is_valid else (128, 128, 128)
 
         font_scale = 0.9
-        cv2.putText(img, f"Mode: {mode_name}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), 2)
-        cv2.putText(img, f"Frame: {frame_idx} / {total}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 1)
-        cv2.putText(img, clip_info, (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_col, 2)
+        cv2.putText(
+            img,
+            f"Mode: {mode_name}",
+            (10, 30), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), 2)
+        cv2.putText(
+            img,
+            f"Frame: {frame_idx} / {total}",
+            (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 200, 200), 1)
+        cv2.putText(
+            img,
+            clip_info,
+            (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, status_col, 2)
 
     @staticmethod
     def _check_validity(frame_idx, ranges):
