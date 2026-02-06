@@ -1,5 +1,9 @@
-import os
+"""
+This module provides a visualization engine for gait analysis results.
 
+It renders skeleton overlays, kinematic trails, center of mass, and gait phase logic
+onto video frames using OpenCV.
+"""
 import cv2
 import numpy as np
 from pathlib import Path
@@ -15,6 +19,13 @@ from utils.json_serializer import KeypointSerializer
 
 class GaitVisualizer:
     def __init__(self, app_config):
+        """
+        Initializes the visualizer with application configuration.
+
+        Args:
+            app_config (dict): The application configuration dictionary containing
+                               visualization settings (colors, thickness, toggles).
+        """
         self.cfg = app_config
 
         skel_name = resolve_skeleton_from_config(app_config)
@@ -22,6 +33,10 @@ class GaitVisualizer:
 
         viz_cfg = self.cfg.get('visualization', {})
         colors_cfg = viz_cfg.get('colors', {})
+        preprocess_cfg = self.cfg.get('preprocessing', {})
+
+        # Visualization confidence
+        self.min_viz_conf = preprocess_cfg.get('confidence_threshold', 0.0)
 
         # Load colors (RGB/HEX -> BGR)
         self.colors = {
@@ -73,6 +88,7 @@ class GaitVisualizer:
                 self.lower_body_ids.add(int(member))
 
     def _get_kp_idx(self, name: str) -> Optional[int]:
+        """Retrieves the index of a named keypoint from the skeleton definition."""
         if name in self.skel.keypoints.__members__:
             return int(self.skel.keypoints[name])
         return None
@@ -133,6 +149,19 @@ class GaitVisualizer:
                       keypoints_data: Union[np.ndarray, str],
                       valid_ranges: List[Tuple[int, int]] = None,
                       gait_data: Dict = None):
+        """
+        Processes a video file, overlaying visual elements based on the provided data.
+
+        Args:
+            video_path (str): Path to the input video file.
+            output_root (str): Directory where output videos will be saved.
+            keypoints_data (Union[np.ndarray, str]): Keypoints array (N, K, 3) or path to JSON.
+            valid_ranges (List[Tuple[int, int]], optional): List of valid frame ranges (start, end).
+            gait_data (Dict, optional): Dictionary containing detected gait events and phases.
+
+        Raises:
+            IOError: If the video file cannot be opened.
+        """
 
         vid_path = Path(video_path)
         out_root = Path(output_root)
@@ -261,11 +290,12 @@ class GaitVisualizer:
 
     def _draw_skeleton(self, img, keypoints, color_mode='side', override_colors=None, use_dimmed=False,
                        restrict_to_legs=False):
+        """Draws the skeleton structure (links and joints) on the frame."""
         # LINKS
         for link_name, (kp1_enum, kp2_enum) in self.skel.links.items():
             idx1, idx2 = int(kp1_enum), int(kp2_enum)
             if idx1 >= len(keypoints) or idx2 >= len(keypoints): continue
-            if keypoints[idx1][2] < 0.3 or keypoints[idx2][2] < 0.3: continue
+            if keypoints[idx1][2] < self.min_viz_conf or keypoints[idx2][2] < self.min_viz_conf: continue
 
             pt1 = (int(keypoints[idx1][0]), int(keypoints[idx1][1]))
             pt2 = (int(keypoints[idx2][0]), int(keypoints[idx2][1]))
@@ -291,7 +321,7 @@ class GaitVisualizer:
 
         # KEYPOINTS
         for i, kp_data in enumerate(keypoints):
-            if kp_data[2] < 0.3: continue
+            if kp_data[2] < self.min_viz_conf: continue
             center = (int(kp_data[0]), int(kp_data[1]))
 
             if use_dimmed:
@@ -311,6 +341,7 @@ class GaitVisualizer:
             cv2.circle(img, center, self.radius, color, -1)
 
     def _draw_trails(self, img, buffers):
+        """Renders the motion trails for ankles."""
         for side_name, buffer in buffers.items():
             pts = list(buffer)
             if len(pts) < 2: continue
@@ -322,29 +353,29 @@ class GaitVisualizer:
 
             cv2.polylines(img, [np.array(pts)], False, color, self.trail_thickness)
 
-    @staticmethod
-    def _update_trails(buffers, kps, l_idx, r_idx):
+    def _update_trails(self, buffers, kps, l_idx, r_idx):
+        """Updates trail buffers with current keypoint positions."""
         # If skeleton does not have required keypoints - skip
         if l_idx is None or r_idx is None: return
 
         def add(idx, name):
-            if idx < len(kps) and kps[idx][2] > 0.3:
+            if idx < len(kps) and kps[idx][2] > self.min_viz_conf:
                 buffers[name].append((int(kps[idx][0]), int(kps[idx][1])))
 
         add(l_idx, 'left')
         add(r_idx, 'right')
 
-    @staticmethod
-    def _update_footprints(fp_list, gait_data, frame_idx, kps,
+    def _update_footprints(self, fp_list, gait_data, frame_idx, kps,
                            l_ankle, r_ankle, l_heel, r_heel, l_toe, r_toe):
+        """Registers new footprints based on detected gait events."""
         if not gait_data or 'events' not in gait_data: return
 
         def get_best_point(preferred, fallback, kps):
             # Preferred = Heel/Toe
-            if preferred is not None and preferred < len(kps) and kps[preferred][2] > 0.3:
+            if preferred is not None and preferred < len(kps) and kps[preferred][2] > self.min_viz_conf:
                 return preferred
             # Fallback = Ankle
-            if fallback is not None and fallback < len(kps) and kps[fallback][2] > 0.3:
+            if fallback is not None and fallback < len(kps) and kps[fallback][2] > self.min_viz_conf:
                 return fallback
             return None
 
@@ -369,6 +400,7 @@ class GaitVisualizer:
         check(gait_data['events'].get('right', []), r_ankle, r_heel, r_toe)
 
     def _draw_footprints_render(self, img, fp_list, curr_frame):
+        """Draws active footprints with a fading effect."""
         active = []
         for (x, y, t, f_type) in fp_list:
             age = curr_frame - t
@@ -385,15 +417,16 @@ class GaitVisualizer:
         fp_list[:] = active
 
     def _draw_com_drop(self, img, kps, l_hip, r_hip):
+        """Visualizes the Center of Mass projection to the ground."""
         if l_hip is None or r_hip is None: return
         if l_hip >= len(kps) or r_hip >= len(kps): return
 
-        if kps[l_hip][2] < 0.3 or kps[r_hip][2] < 0.3: return
+        if kps[l_hip][2] < self.min_viz_conf or kps[r_hip][2] < self.min_viz_conf: return
 
         mx = int((kps[l_hip][0] + kps[r_hip][0]) / 2)
         my = int((kps[l_hip][1] + kps[r_hip][1]) / 2)
 
-        valid_ys = [p[1] for p in kps if p[2] > 0.3]
+        valid_ys = [p[1] for p in kps if p[2] > self.min_viz_conf]
         if not valid_ys: return
         ground_y = int(max(valid_ys))
 
@@ -403,6 +436,7 @@ class GaitVisualizer:
 
     @staticmethod
     def _draw_info_box(img, frame_idx, total, clip_info, is_valid, mode_name):
+        """Draws a status box with frame and clip information."""
         # Background rectangle
         cv2.rectangle(img, (0, 0), (450, 100), (0, 0, 0), -1)
 
@@ -424,6 +458,7 @@ class GaitVisualizer:
 
     @staticmethod
     def _check_validity(frame_idx, ranges):
+        """Checks if the current frame is within a valid analysis range."""
         if not ranges:
             return True, "Full Video", 0
 
@@ -434,6 +469,7 @@ class GaitVisualizer:
         return False, "Excluded", -1
 
     def _get_phase_colors_at_frame(self, frame_idx, gait_data):
+        """Determines leg colors based on the current gait phase (Stance/Swing)."""
         c_left = self.phase_colors[PhaseType.UNKNOWN]
         c_right = self.phase_colors[PhaseType.UNKNOWN]
 
@@ -453,6 +489,7 @@ class GaitVisualizer:
 
     @staticmethod
     def _parse_color(color_input: Union[List[int], str]) -> Tuple[int, int, int]:
+        """Parses color input (RGB list or HEX string) into BGR tuple."""
         # If list/tuple -> expect RGB input
         if isinstance(color_input, (list, tuple)):
             if len(color_input) >= 3:
@@ -477,5 +514,6 @@ class GaitVisualizer:
 
     @staticmethod
     def _create_writer(root, stem, suffix, fps, size):
+        """Creates a VideoWriter instance for output."""
         path = root / f"{stem}_{suffix}.mp4"
         return cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
