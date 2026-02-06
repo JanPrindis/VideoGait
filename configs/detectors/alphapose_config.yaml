@@ -14,5 +14,5 @@ params:
   # GPU ID (string "0" or "0,1" for multi-gpu)
   gpus: "0"
 
-  # Minimal height of bounding box for detection (px)
-  min_bbox_size: 250
+  # Minimal height of bounding box for detection
+  min_bbox_size: 0
