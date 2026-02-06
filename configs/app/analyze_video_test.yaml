@@ -1,0 +1,72 @@
+preprocessing:
+  framerate: 60             # Default value, is used for Heuristic detection, if NN is used, it will match the framerate the model has been trained on. The input video will be interpolated to this value.
+  confidence_threshold: 0.4 # Keypoints under this confidence are ignored
+  exclude_ratio: 0.15       # % of patient movement to ignore on both edges (incomplete detection, or patient turning)
+  min_segment_length: 60
+  outlier_ratio: 0.2
+
+  use_filter: true    # Use Butterworth filter for smoothing
+
+  # Butterworth filter params
+  filter_cutoff: 6
+  filter_order: 4
+
+output:
+  output_root_dir: "results"
+  save_video: true
+  save_report: true
+
+# Keypoint detector
+pose_detector:
+  config_path: "configs/detectors/rtmlib_config.yaml"
+
+# Gait event detection
+event_detector:
+  #"NeuralNet" or "Heuristic"
+  method: "NeuralNet"
+
+  # NeuralNet configuration
+  neural_net:
+    experiment_path: "experiments/BiGRU_RTMLIB"        # Name of the experiment folder
+    checkpoint: "best_model.pth"                        # Name of the checkpoint file (stays the same)
+
+    post_processing:
+      threshold: 0.4            # Gait event minimal confidence threshold
+      min_distance_sec: 0.25    # Minimal time distance (in seconds) of subsequent gait events of the same type (duplicate detections)
+
+
+# Visualization
+visualization:
+  text_output_type: "pdf" # pdf / md / console
+  event_detector_debug_plots: true  # Save debug plots of gait event detector (for validation, or fine-tuning)
+
+  # Video visualization
+  colors:
+      # Skeleton colors (Inspection & Kinematics mode)
+      left: "#00BFFF"         # Left side keypoints
+      right: "#FF4500"        # Right side keypoints
+      center: "#ADFF2F"       # Central keypoints
+      dimmed: [100, 100, 100] # Grayed out irrelevant part
+
+      # Gait phases (Logic mode)
+      stance: "#00FF7F"           # Leg stance phase
+      swing: "#FF1493"            # Leg swing phase
+      unknown: [80, 80, 80]       # Grayed out - unknown
+
+      # Kinematics (Kinematics mode)
+      footprint_to: "#FFD700"     # Toe-off marker color
+      footprint_hs: "#9400D3"     # Heel-strike marker color
+      com_line: "#00FFFF"         # Center-of-mass to ground line color
+
+  # Keypoints style
+  line_thickness: 3          # Skeleton line thickness (px)
+  keypoint_radius: 5         # Skeleton keypoint marker radius (px)
+  trail_thickness: 2         # Feet trail thickness (px)
+
+  footprint_duration: 120     # How long are footprint markers displayed (frames)
+
+  # Video output toggles
+  outputs:
+      enable_overlay: true     # Generate *_inspection.mp4 (Clean overlay + ranges check)
+      enable_kinematics: true  # Generate *_kinematics.mp4 (Trails, Footprints, CoM)
+      enable_logic: true       # Generate *_logic.mp4 (Gait phase visualization)

@@ -17,6 +17,8 @@ from detectors.inference import run_pose_extraction
 from gaitDetectHeuristic.tools.inference import run_heuristic_inference
 from gaitDetectNN.tools.inference import run_nn_inference
 from utils.visualizer import GaitVisualizer
+from utils.analysis import GaitAnalyzer
+from utils.plotting import GaitPlotter
 
 def load_yaml(path):
     with open(path, 'r') as f:
@@ -25,7 +27,7 @@ def load_yaml(path):
 
 def main():
     input_video_path = "videos/Test1.mov"
-    app_config_path = "configs/app/analyze_video_bigru.yaml"
+    app_config_path = "configs/app/analyze_video_test.yaml"
 
     analysis_name_override = None
     output_root_override = None
@@ -131,6 +133,10 @@ def main():
         event_data["global_ranges"]
     )
 
+    # TODO: Add NONE checks
+    # TODO: Check knee angle calculation (is it supposed to be positive or negative)
+    # TODO: Check cyclogram implementation
+
     print("-" * 30)
 
     # --- VIDEO VISUALIZATION ---
@@ -141,7 +147,8 @@ def main():
     gait_data = {
         "events": event_data["events"],
         "left_phases": l_phases,
-        "right_phases": r_phases
+        "right_phases": r_phases,
+        "support_phases": support_phases
     }
 
     visualizer.process_video(
@@ -152,6 +159,18 @@ def main():
         gait_data=gait_data
     )
 
+    # --- RUN ANALYSIS ---
+    analyzer = GaitAnalyzer(app_config)
+    analysis_report = analyzer.run_analysis(
+        keypoints_path=str(output_dir / "pose_detector_data" / f"{an_name}.json"),
+        events_data=event_data,
+        gait_data=gait_data,
+        output_dir=str(output_dir)
+    )
+
+    # --- GENERATE PLOTS ---
+    plotter = GaitPlotter(str(output_dir / "plots"))
+    plotter.generate_plots_from_json(str(output_dir / "analysis.json"))
 
 if __name__ == "__main__":
     main()
