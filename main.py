@@ -134,8 +134,6 @@ def main():
     )
 
     # TODO: Add NONE checks
-    # TODO: Check knee angle calculation (is it supposed to be positive or negative)
-    # TODO: Check cyclogram implementation
 
     print("-" * 30)
 
