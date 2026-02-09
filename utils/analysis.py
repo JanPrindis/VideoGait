@@ -86,16 +86,22 @@ class GaitAnalyzer:
         leg_length_px = self._estimate_leg_length(filtered_kps, valid_ranges)
 
         # Spatio-Temporal Metrics (Cadence, Step Times, Support Ratio)
-        spatiotemporal = self._calc_spatiotemporal(events_data, support_phases, framerate)
+        spatiotemporal = self._calc_spatiotemporal(l_phases, r_phases, support_phases, valid_ranges, framerate)
+
+        # Spatial Parameters (Distance based)
+        spatial_params = self._calc_spatial_parameters(filtered_kps, l_phases, r_phases, leg_length_px, spatiotemporal)
 
         # Kinematics (Angles with Clinical Offsets and Direction Correction)
-        kinematics_raw = self._calc_kinematics_signed(filtered_kps)
+        kinematics_raw = self._calc_kinematics_signed(filtered_kps, valid_ranges)
+
+        # Center of mass analysis (Hip center to virtual floor - lowest point)
+        com_analysis = self._calc_com_analysis(filtered_kps, leg_length_px, valid_ranges)
 
         # Aggregated Cycles (Normalized to 0-100% of gait cycle)
-        cycles_stats = self._aggregate_cycles(kinematics_raw, events_data, framerate)
+        cycles_stats = self._aggregate_cycles(kinematics_raw, l_phases, r_phases, valid_ranges)
 
         # Detailed Statistics (Min/Max/Mean for every single detected step)
-        detailed_stats = self._calc_detailed_stats(kinematics_raw, l_phases, r_phases, framerate)
+        detailed_stats = self._calc_detailed_stats(kinematics_raw, l_phases, r_phases, valid_ranges, framerate)
 
         # Symmetry Analysis (Left vs Right comparison)
         symmetry_stats = self._calc_symmetry_metrics(spatiotemporal, cycles_stats)
@@ -115,11 +121,13 @@ class GaitAnalyzer:
                 "valid_ranges": valid_ranges
             },
             "spatiotemporal": spatiotemporal,
+            "spatial": spatial_params,
             "gait_phases": phases_export,
             "kinematics_stats": cycles_stats,
             "detailed_statistics": detailed_stats,
             "symmetry_statistics": symmetry_stats,
-            "raw_kinematics": kinematics_raw
+            "raw_kinematics": kinematics_raw,
+            "com_analysis": com_analysis
         }
 
         os.makedirs(output_dir, exist_ok=True)
@@ -134,89 +142,209 @@ class GaitAnalyzer:
     # -------------------------------------------------------------------------
     # SPATIO-TEMPORAL LOGIC
     # -------------------------------------------------------------------------
-    def _calc_spatiotemporal(self, events_data, support_phases, fps):
+    @staticmethod
+    def _calc_spatiotemporal(l_phases, r_phases, support_phases, valid_ranges, fps):
         """
-        Calculates basic temporal metrics: Cadence, Stride/Stance/Swing durations.
+        Calculates temporal gait parameters including cadence, stride time, and support ratios.
+
+        Args:
+            l_phases (list): List of left leg GaitPhase objects.
+            r_phases (list): List of right leg GaitPhase objects.
+            support_phases (list): List of SupportPhase objects.
+            valid_ranges (list): List of valid frame ranges.
+            fps (float): Frames per second.
+
+        Returns:
+            dict: Dictionary containing temporal metrics for left/right legs and global stats.
         """
         stats = {}
-        src = self._extract_events_dict(events_data)
-        all_frames = []
 
-        # Process Left and Right legs individually
-        for side in ['left', 'right']:
-            raw_events = src.get(side, [])
+        # Collector for all valid stride durations (from both legs)
+        all_stride_durations = []
 
-            # Filter and sort events
-            hs_frames = sorted([e.frame for e in raw_events
-                                if hasattr(e, 'event_type') and e.event_type == GaitEventType.HEEL_STRIKE])
-            to_frames = sorted([e.frame for e in raw_events
-                                if hasattr(e, 'event_type') and e.event_type == GaitEventType.TOE_OFF])
+        def process_side(phases):
+            stance_durs = []
+            swing_durs = []
+            stride_durs = []  # Local for average calculation
 
-            if hs_frames:
-                all_frames.extend(hs_frames)
+            # Sort phases by time
+            sorted_phases = sorted(phases, key=lambda x: x.start_frame)
 
-            # Calculate Stride Time (Heel Strike to next Heel Strike)
-            stride_times = []
-            for i in range(len(hs_frames) - 1):
-                duration = (hs_frames[i + 1] - hs_frames[i]) / fps
-                stride_times.append(duration)
+            i = 0
+            while i < len(sorted_phases):
+                p = sorted_phases[i]
 
-            # Calculate Stance and Swing Times
-            stance_times = []
-            swing_times = []
+                # Check validity against ranges
+                mid_frame = (p.start_frame + p.end_frame) / 2
+                is_valid = True
+                if valid_ranges:
+                    is_valid = False
+                    for v_start, v_end in valid_ranges:
+                        if v_start <= mid_frame <= v_end:
+                            is_valid = True
+                            break
 
-            for hs in hs_frames:
-                # Find the immediate next Toe Off
-                candidates_to = [t for t in to_frames if t > hs]
+                if not is_valid:
+                    i += 1
+                    continue
 
-                if candidates_to:
-                    next_to = min(candidates_to)
-                    stance_duration = (next_to - hs) / fps
-                    stance_times.append(stance_duration)
+                dur_s = p.duration / fps
+                ptype = str(p.phase_type).upper()
 
-                    # Find the immediate next Heel Strike after that Toe Off
-                    candidates_hs = [h for h in hs_frames if h > next_to]
-                    if candidates_hs:
-                        swing_duration = (min(candidates_hs) - next_to) / fps
-                        swing_times.append(swing_duration)
+                if "STANCE" in ptype:
+                    stance_durs.append(dur_s)
 
-            stats[side] = {
-                "stride_time_avg": np.mean(stride_times) if stride_times else 0,
-                "stance_time_avg": np.mean(stance_times) if stance_times else 0,
-                "swing_time_avg": np.mean(swing_times) if swing_times else 0,
-                "step_count": len(hs_frames)
+                    # Try to find the following Swing to complete a STRIDE
+                    if i + 1 < len(sorted_phases):
+                        p_next = sorted_phases[i + 1]
+                        # Check continuity (max 2 frames gap)
+                        if "SWING" in str(p_next.phase_type).upper() and (p_next.start_frame - p.end_frame) <= 2:
+                            stride_s = dur_s + (p_next.duration / fps)
+                            stride_durs.append(stride_s)
+                            all_stride_durations.append(stride_s)  # Add to global collector
+
+                elif "SWING" in ptype:
+                    swing_durs.append(dur_s)
+
+                i += 1
+
+            avg_stance = float(np.mean(stance_durs)) if stance_durs else 0.0
+            avg_swing = float(np.mean(swing_durs)) if swing_durs else 0.0
+
+            # Prefer measured strides, fallback to sum of averages
+            if stride_durs:
+                avg_stride = float(np.mean(stride_durs))
+            else:
+                avg_stride = avg_stance + avg_swing
+
+            return {
+                "stride_time_avg": avg_stride,
+                "stance_time_avg": avg_stance,
+                "swing_time_avg": avg_swing,
+                "step_count": len(stance_durs)
             }
 
-        # Calculate Global Cadence (Steps per Minute)
-        cadence = 0
+        stats['left'] = process_side(l_phases)
+        stats['right'] = process_side(r_phases)
+
+        # --- GLOBAL CADENCE CALCULATION ---
+        # Cadence = 120 / Avg_Stride_Time
+        cadence = 0.0
+        if all_stride_durations:
+            global_avg_stride = np.mean(all_stride_durations)
+            if global_avg_stride > 0:
+                cadence = 120.0 / float(global_avg_stride)
+
+        # Total steps (just for info)
         total_steps = stats['left']['step_count'] + stats['right']['step_count']
 
-        if all_frames:
-            total_duration_sec = (max(all_frames) - min(all_frames)) / fps
-            if total_duration_sec > 1:
-                cadence = (total_steps / total_duration_sec) * 60
-
-        stats['global'] = {"cadence": cadence, "total_steps": total_steps}
-
-        # Calculate Support Ratio (Time spent in Single vs Double support)
-        total_single = 0
-        total_double = 0
-
-        for p in support_phases:
-            duration = p.duration / fps
-            ptype_str = str(p.support_type).lower()
-
-            if "double" in ptype_str:
-                total_double += duration
-            elif any(x in ptype_str for x in ["single", "left", "right"]):
-                total_single += duration
-
-        stats['support_ratio'] = {
-            "single_total_s": total_single,
-            "double_total_s": total_double
+        stats['global'] = {
+            "cadence": cadence,
+            "total_steps": total_steps
         }
 
+        # --- SUPPORT RATIO ---
+        total_single, total_double = 0, 0
+        for p in support_phases:
+            # Check validity center
+            mid = (p.start_frame + p.end_frame) / 2
+            in_range = True
+            if valid_ranges:
+                in_range = any(s <= mid <= e for s, e in valid_ranges)
+
+            if in_range:
+                dur = p.duration / fps
+                pt = str(p.support_type).lower()
+                if "double" in pt:
+                    total_double += dur
+                elif any(x in pt for x in ["single", "left", "right"]):
+                    total_single += dur
+
+        stats['support_ratio'] = {"single_total_s": total_single, "double_total_s": total_double}
         return stats
+
+    # -------------------------------------------------------------------------
+    # SPATIAL PARAMETERS
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _calc_spatial_parameters(kps, l_phases, r_phases, leg_len_px, spatiotemporal):
+        """
+        Calculates spatial metrics normalized by leg length (%LL).
+        - Step Length: Horizontal distance between ankles at Heel Strike.
+        - Stride Length: Sum of Avg Step L + Avg Step R (accounts for asymmetry).
+        - Velocity: Calculated as Stride Length / Stride Time.
+
+        Args:
+            kps (dict): Keypoints dictionary.
+            l_phases (list): List of left leg GaitPhase objects.
+            r_phases (list): List of right leg GaitPhase objects.
+            leg_len_px (float): Leg length in pixels.
+            spatiotemporal (dict): Result from _calc_spatiotemporal.
+
+        Returns:
+            dict: Dictionary containing spatial metrics.
+        """
+        if leg_len_px <= 0: return {}
+
+        l_ankle = kps.get('LEFT_ANKLE', [])
+        r_ankle = kps.get('RIGHT_ANKLE', [])
+
+        # Helper to calculate step length for a list of phases
+        def calc_step_lengths(phases, primary_ankle, secondary_ankle):
+            steps = []
+            for p in phases:
+                if p.phase_type == PhaseType.STANCE:
+                    # Heel Strike is the start frame of Stance
+                    hs_frame = int(p.start_frame)
+
+                    if hs_frame < len(primary_ankle) and hs_frame < len(secondary_ankle):
+                        p1 = primary_ankle[hs_frame]
+                        p2 = secondary_ankle[hs_frame]
+
+                        if p1 is not None and p2 is not None and p1[0] != 0 and p2[0] != 0:
+                            # Horizontal distance (X-axis difference)
+                            dist_px = abs(p1[0] - p2[0])
+                            steps.append((dist_px / leg_len_px) * 100.0)
+            return steps
+
+        # Distances (Step Lengths)
+        l_step_vals = calc_step_lengths(l_phases, l_ankle, r_ankle)
+        r_step_vals = calc_step_lengths(r_phases, r_ankle, l_ankle)
+
+        avg_step_l = float(np.mean(l_step_vals)) if l_step_vals else 0.0
+        avg_step_r = float(np.mean(r_step_vals)) if r_step_vals else 0.0
+
+        # Stride Length = Step L + Step R
+        avg_stride_len = avg_step_l + avg_step_r
+
+        # Velocity (Distance / Time)
+        st_l = spatiotemporal.get('left', {}).get('stride_time_avg', 0)
+        st_r = spatiotemporal.get('right', {}).get('stride_time_avg', 0)
+
+        # Calculate real average stride time
+        times = [t for t in [st_l, st_r] if t > 0]
+        avg_stride_time = np.mean(times) if times else 0.0
+
+        # Velocity = Stride Length (%LL) / Stride Time (s)
+        velocity = 0.0
+        if avg_stride_time > 0:
+            velocity = avg_stride_len / avg_stride_time
+
+        return {
+            "left": {
+                "step_length_avg_percent": avg_step_l,
+                "stride_length_avg_percent": avg_stride_len,
+            },
+            "right": {
+                "step_length_avg_percent": avg_step_r,
+                "stride_length_avg_percent": avg_stride_len,
+            },
+            "global": {
+                "step_length_avg_percent": (avg_step_l + avg_step_r) / 2.0,
+                "stride_length_avg_percent": avg_stride_len,
+                "velocity_percent_per_sec": velocity
+            }
+        }
 
     # -------------------------------------------------------------------------
     # SYMMETRY LOGIC
@@ -227,6 +355,13 @@ class GaitAnalyzer:
         Calculates Symmetry Index (SI) as a percentage.
         Formula: SI = |L - R| / (0.5 * (L + R)) * 100
         0% indicates perfect symmetry.
+
+        Args:
+            spatio (dict): Spatiotemporal metrics dictionary.
+            cycles (dict): Aggregated gait cycles dictionary.
+
+        Returns:
+            dict: Dictionary containing symmetry indices.
         """
         sym_stats = {}
         l_stats = spatio.get('left', {})
@@ -277,98 +412,82 @@ class GaitAnalyzer:
     # STATISTICS LOGIC
     # -------------------------------------------------------------------------
     @staticmethod
-    def _calc_detailed_stats(kinematics, l_phases, r_phases, fps):
+    def _calc_detailed_stats(kinematics, l_phases, r_phases, valid_ranges, fps):
         """
-        Extracts Mean, Min, Max, and Range for EACH individual phase (step).
-        This data is used for detailed tables in the report.
+        Extracts Mean, Min, Max, and Range for each individual phase.
+        Ensures consistency with graphs by filtering valid ranges and checking hip polarity.
+
+        Args:
+            kinematics (dict): Dictionary of kinematic signals (angles).
+            l_phases (list): List of left leg GaitPhase objects.
+            r_phases (list): List of right leg GaitPhase objects.
+            valid_ranges (list): List of valid frame ranges.
+            fps (float): Frames per second.
+
+        Returns:
+            dict: Nested dictionary containing detailed stats per joint and side.
         """
         stats_out = {"left": {}, "right": {}}
-
-        joint_map = {
-            "Hip": ["SHOULDER", "HIP", "KNEE"],
-            "Knee": ["HIP", "KNEE", "ANKLE"],
-            "Ankle": ["KNEE", "ANKLE", "FOOT"]
-        }
+        joint_map = {"Hip": ["SHOULDER", "HIP", "KNEE"], "Knee": ["HIP", "KNEE", "ANKLE"],
+                     "Ankle": ["KNEE", "ANKLE", "FOOT"]}
 
         def process_side(side_name, phases):
             side_stats = {}
-
-            for joint_simple_name, keywords in joint_map.items():
-                # Find the full data key (e.g., 'angle_LEFT_KNEE...')
+            for joint_simple, keywords in joint_map.items():
                 data_key = next((k for k in kinematics if all(kw in k for kw in keywords) and side_name.upper() in k),
                                 None)
-                if not data_key:
-                    continue
+                if not data_key: continue
 
-                full_signal = np.array(kinematics[data_key])
-                phase_details_list = []
+                signal = np.array(kinematics[data_key])
+                phase_details = []
+                aggregators = {"Stance": {"dur": [], "mean": [], "min": [], "max": [], "range": []},
+                               "Swing": {"dur": [], "mean": [], "min": [], "max": [], "range": []}}
 
-                # Aggregators for global summary (Stance vs Swing)
-                aggregators = {
-                    "Stance": {"dur": [], "mean": [], "min": [], "max": [], "range": []},
-                    "Swing": {"dur": [], "mean": [], "min": [], "max": [], "range": []}
-                }
-
-                # Iterate through every single detected phase
                 for i, p in enumerate(phases):
-                    start_frame, end_frame = int(p.start_frame), int(p.end_frame)
+                    start, end = int(p.start_frame), int(p.end_frame)
 
-                    if start_frame >= len(full_signal):
-                        continue
+                    # --- VALID RANGE CHECK ---
+                    if valid_ranges:
+                        is_in_range = False
+                        for v_start, v_end in valid_ranges:
+                            if start >= v_start and end <= v_end:
+                                is_in_range = True
+                                break
+                        if not is_in_range:
+                            continue  # Skip this phase in stats
 
-                    # Extract the signal segment for this specific step
-                    segment = full_signal[start_frame: end_frame + 1]
-                    segment = segment[segment is not None]  # Filter out missing data
+                    if start >= len(signal): continue
+                    seg = signal[start: end + 1]
+                    seg = seg[seg is not None]
+                    if len(seg) == 0: continue
 
-                    if len(segment) == 0:
-                        continue
+                    # --- HIP POLARITY CHECK ---
+                    # STANCE: Start (HS) must be positive.
+                    if "HIP" in joint_simple.upper() and p.phase_type == PhaseType.STANCE:
+                        if np.mean(seg[:min(5, len(seg))]) < 0:
+                            seg = -seg  # Flip to match the graph logic
 
-                    # Compute statistics
-                    s_mean = np.mean(segment)
-                    s_min = np.min(segment)
-                    s_max = np.max(segment)
-                    s_range = s_max - s_min
-                    duration_s = (end_frame - start_frame) / fps
+                    s_mean, s_min, s_max = np.mean(seg), np.min(seg), np.max(seg)
+                    dur = (end - start) / fps
+                    ptype = "Stance" if p.phase_type == PhaseType.STANCE else "Swing"
 
-                    phase_type_str = "Stance" if p.phase_type == PhaseType.STANCE else "Swing"
-
-                    # Store detailed info
-                    phase_details_list.append({
-                        "id": i + 1,
-                        "type": phase_type_str,
-                        "frames": [start_frame, end_frame],
-                        "duration": duration_s,
-                        "mean": s_mean,
-                        "min": s_min,
-                        "max": s_max,
-                        "range": s_range
+                    phase_details.append({
+                        "id": i + 1, "type": ptype, "frames": [start, end],
+                        "duration": dur, "mean": s_mean, "min": s_min, "max": s_max, "range": s_max - s_min
                     })
 
-                    # Add to aggregators
-                    if phase_type_str in aggregators:
-                        aggregators[phase_type_str]["dur"].append(duration_s)
-                        aggregators[phase_type_str]["mean"].append(s_mean)
-                        aggregators[phase_type_str]["min"].append(s_min)
-                        aggregators[phase_type_str]["max"].append(s_max)
-                        aggregators[phase_type_str]["range"].append(s_range)
+                    if ptype in aggregators:
+                        for k, v in zip(["dur", "mean", "min", "max", "range"],
+                                        [dur, s_mean, s_min, s_max, s_max - s_min]): aggregators[ptype][k].append(v)
 
-                # Calculate Summary
                 summary = {}
-                for ptype, vals in aggregators.items():
-                    if vals["dur"]:
-                        summary[ptype] = {
-                            "avg_duration": float(np.mean(vals["dur"])),
-                            "avg_rom": float(np.mean(vals["range"])),
-                            "avg_mean": float(np.mean(vals["mean"])),
-                            "abs_min": float(np.min(vals["min"])),
-                            "abs_max": float(np.max(vals["max"]))
-                        }
-
-                side_stats[joint_simple_name] = {
-                    "phases": phase_details_list,
-                    "summary": summary
-                }
-
+                for ptype, d in aggregators.items():
+                    if d["dur"]: summary[ptype] = {"avg_duration": float(np.mean(d["dur"])),
+                                                   "avg_rom": float(np.mean(d["range"])),
+                                                   "avg_mean": float(np.mean(d["mean"])),
+                                                   "abs_min": float(np.min(d["min"])),
+                                                   "abs_max": float(np.max(d["max"]))}
+                side_stats[joint_simple] = {"phases": phase_details, "summary": summary}
             return side_stats
 
         stats_out["left"] = process_side("left", l_phases)
@@ -378,11 +497,33 @@ class GaitAnalyzer:
     # -------------------------------------------------------------------------
     # KINEMATICS LOGIC
     # -------------------------------------------------------------------------
-    def _calc_kinematics_signed(self, kps):
-        direction = self._detect_walking_direction(kps)
-        angles_data = {}
+    def _calc_kinematics_signed(self, kps, valid_ranges):
+        """
+        Calculates joint angles with direction correction.
+        Includes a robustness check: if Hip mean is negative, flip the whole segment.
 
-        # Definitions: (OutputKey, Point1, Point2, Point3, JointType)
+        Args:
+            kps (dict): Keypoints dictionary.
+            valid_ranges (list): List of valid frame ranges.
+
+        Returns:
+            dict: Dictionary of calculated angles (list of floats per frame).
+        """
+        # 1. Initial Direction Detection
+        any_key = next(iter(kps))
+        total_frames = len(kps[any_key])
+        directions = np.ones(total_frames)
+
+        # Detect direction per segment (valid range)
+        if valid_ranges:
+            for start, end in valid_ranges:
+                dir_mult = self._detect_walking_direction_segment(kps, start, end)
+                directions[start:end + 1] = dir_mult
+        else:
+            dir_mult = self._detect_walking_direction_segment(kps, 0, total_frames - 1)
+            directions[:] = dir_mult
+
+        angles_data = {}
         definitions = [
             ("angle_LEFT_SHOULDER-LEFT_HIP-LEFT_KNEE", "LEFT_SHOULDER", "LEFT_HIP", "LEFT_KNEE", "hip"),
             ("angle_RIGHT_SHOULDER-RIGHT_HIP-RIGHT_KNEE", "RIGHT_SHOULDER", "RIGHT_HIP", "RIGHT_KNEE", "hip"),
@@ -392,33 +533,23 @@ class GaitAnalyzer:
             ("angle_RIGHT_KNEE-RIGHT_ANKLE-RIGHT_FOOT_INDEX", "RIGHT_KNEE", "RIGHT_ANKLE", "RIGHT_FOOT_INDEX", "ankle")
         ]
 
-        # Get total frames from any keypoint list
-        any_key = next(iter(kps))
-        total_frames = len(kps[any_key])
-
+        # Calculate Angles
         for output_name, p1_name, p2_name, p3_name, joint_type in definitions:
-
-            # Skip if skeleton doesn't have required joints
             if any(k not in kps for k in [p1_name, p2_name, p3_name]):
                 continue
 
             values_list = []
             for i in range(total_frames):
-                p1 = kps[p1_name][i]
-                p2 = kps[p2_name][i]
-                p3 = kps[p3_name][i]
+                p1, p2, p3 = kps[p1_name][i], kps[p2_name][i], kps[p3_name][i]
 
                 if p1 is None or p2 is None or p3 is None:
                     values_list.append(None)
                     continue
 
-                # Convert to numpy (ignore confidence)
-                v1 = np.array(p1[:2])
-                v2 = np.array(p2[:2])
-                v3 = np.array(p3[:2])
+                v1, v2, v3 = np.array(p1[:2]), np.array(p2[:2]), np.array(p3[:2])
 
-                # Flip X coordinates if walking Right -> Left
-                if direction < 0:
+                # Apply Direction Flip
+                if directions[i] < 0:
                     v1[0] *= -1
                     v2[0] *= -1
                     v3[0] *= -1
@@ -426,10 +557,113 @@ class GaitAnalyzer:
                 angle = self._calculate_2d_angle(v1, v2, v3, joint_type)
                 values_list.append(angle)
 
+            # Force Polarity
+            # If the calculated hip angle is mostly negative, it means direction detection failed.
+            if joint_type == "hip":
+                ranges_to_check = valid_ranges if valid_ranges else [(0, total_frames - 1)]
+
+                for start, end in ranges_to_check:
+                    # Extract segment indices that have data
+                    segment_indices = [i for i in range(start, min(end + 1, len(values_list))) if
+                                       values_list[i] is not None]
+
+                    if not segment_indices:
+                        continue
+
+                    # Calculate mean of the segment
+                    segment_vals = [values_list[i] for i in segment_indices]
+                    mean_val = np.mean(segment_vals)
+
+                    # If Hip angle is negative on average, flip the whole segment
+                    if mean_val < 0:
+                        for i in segment_indices:
+                            values_list[i] *= -1.0
+
             angles_data[output_name] = values_list
 
         return angles_data
 
+    # -------------------------------------------------------------------------
+    # CoM LOGIC
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _calc_com_analysis(kps, leg_len_px, valid_ranges):
+        """
+        Calculates Center of Mass (CoM) vertical excursion statistics.
+
+        The CoM is approximated as the midpoint between the hips. Its vertical
+        distance from the lowest foot point (virtual floor) is calculated and
+        normalized as a percentage of leg length.
+
+        Args:
+            kps (dict): Keypoints dictionary.
+            leg_len_px (float): Estimated leg length in pixels for normalization.
+            valid_ranges (list): List of valid frame ranges to analyze.
+
+        Returns:
+            dict: Dictionary containing 'statistics' (mean, min, max, range, std)
+                  and 'raw_signal' (list of normalized heights per frame).
+        """
+
+        if leg_len_px <= 0: return {}
+
+        l_hip = kps.get('LEFT_HIP', [])
+        r_hip = kps.get('RIGHT_HIP', [])
+        feet_keys = ['LEFT_ANKLE', 'RIGHT_ANKLE', 'LEFT_HEEL', 'RIGHT_HEEL', 'LEFT_FOOT_INDEX', 'RIGHT_FOOT_INDEX']
+        feet_data = [kps.get(k, []) for k in feet_keys]
+
+        total_frames = len(l_hip)
+        raw_signal = []
+
+        # Generate Raw Signal (Normalized to % Leg Length)
+        for i in range(total_frames):
+            lh, rh = l_hip[i], r_hip[i]
+
+            if lh is None or rh is None:
+                raw_signal.append(None)
+                continue
+
+            com_y = (lh[1] + rh[1]) / 2.0
+
+            frame_ys = []
+            for fd in feet_data:
+                if i < len(fd) and fd[i] is not None and fd[i][1] != 0:
+                    frame_ys.append(fd[i][1])
+
+            if not frame_ys:
+                raw_signal.append(None)
+                continue
+
+            # Distance from CoM to the lowest foot point
+            height_px = max(frame_ys) - com_y
+            height_norm = (height_px / leg_len_px) * 100.0
+            raw_signal.append(height_norm)
+
+        # Compute statistics for valid ranges
+        valid_values = []
+        ranges_to_check = valid_ranges if valid_ranges else [(0, total_frames - 1)]
+
+        for start, end in ranges_to_check:
+            segment = raw_signal[start: min(end + 1, len(raw_signal))]
+            valid_values.extend([v for v in segment if v is not None])
+
+        stats = {}
+        if valid_values:
+            v_arr = np.array(valid_values)
+            stats = {
+                "mean_height_percent": float(np.mean(v_arr)),
+                "min_height_percent": float(np.min(v_arr)),
+                "max_height_percent": float(np.max(v_arr)),
+                "vertical_excursion_range": float(np.max(v_arr) - np.min(v_arr)),
+                "std_dev": float(np.std(v_arr))
+            }
+
+        return {
+            "statistics": stats,
+            "raw_signal": raw_signal
+        }
+
+    # --- HELPERS ---
     @staticmethod
     def _calculate_2d_angle(p1, p2, p3, joint_type):
         """
@@ -456,25 +690,32 @@ class GaitAnalyzer:
         return 0.0
 
     @staticmethod
-    def _detect_walking_direction(kps):
+    def _detect_walking_direction_segment(kps, start_frame, end_frame):
         """
-        Detects the walking direction based on the slope of the hip's X-coordinate over time.
-        Returns 1.0 for Left->Right, -1.0 for Right->Left.
+        Determines the walking direction for a specific time segment.
+
+        Calculates the slope of the Left Hip's X-coordinate over time.
+
+        Returns:
+            float: 1.0 for Left->Right (increasing X), -1.0 for Right->Left (decreasing X).
         """
         l_hip = kps.get("LEFT_HIP", [])
 
-        # Extract X coordinates where present
-        x_coords = [p[0] for p in l_hip if p is not None]
+        x_coords = []
+        valid_indices = []
 
-        if len(x_coords) < 10:
-            return 1.0  # Default
+        limit = min(end_frame + 1, len(l_hip))
+        for i in range(start_frame, limit):
+            if l_hip[i] is not None and l_hip[i][0] != 0:
+                x_coords.append(l_hip[i][0])
+                valid_indices.append(i)
 
-        # Simple linear fit to determine direction
-        slope, _ = np.polyfit(np.arange(len(x_coords)), x_coords, 1)
+        if len(x_coords) < 5:
+            return 1.0  # Default L->R
 
+        slope, _ = np.polyfit(valid_indices, x_coords, 1)
         return 1.0 if slope >= 0 else -1.0
 
-    # --- HELPERS ---
     def _parse_serializer_data(self, json_data):
         """
         Converts the raw JSON list format into a dictionary of keypoint lists.
@@ -569,63 +810,108 @@ class GaitAnalyzer:
             return events_data.get('events', events_data)
         return {}
 
-    def _aggregate_cycles(self, kinematics, events_data, fps):
+    @staticmethod
+    def _aggregate_cycles(kinematics, l_phases, r_phases, valid_ranges):
         """
         Aggregates kinematic signals into normalized gait cycles (0-100%).
-        
-        Cuts the signal into individual strides based on Heel Strike events,
-        interpolates them to a fixed length (100 points), and computes Mean/Std.
+
+        Args:
+            kinematics (dict): Dictionary of kinematic signals.
+            l_phases (list): List of left leg GaitPhase objects.
+            r_phases (list): List of right leg GaitPhase objects.
+            valid_ranges (list): List of valid frame ranges.
+
+        Returns:
+            dict: Dictionary containing mean/std cycles for each joint.
         """
         stats = {}
-        src = self._extract_events_dict(events_data)
 
-        # Map output keys to sides (Left/Right)
-        angle_to_side = {k: "left" if "LEFT" in k else "right" for k in kinematics}
+        # Helper to extract cycles
+        def extract_cycles_from_phases(phases, signal):
+            cycles = []
+            if not phases or len(phases) < 2: return cycles
 
-        # Pre-calculate Heel Strike frames for both sides
-        hs_map = {}
-        for side in ['left', 'right']:
-            events = src.get(side, [])
-            hs_map[side] = sorted([e.frame for e in events
-                                   if hasattr(e, 'event_type') and e.event_type == GaitEventType.HEEL_STRIKE])
+            # Sort phases by time to be sure
+            sorted_phases = sorted(phases, key=lambda x: x.start_frame)
 
+            i = 0
+            while i < len(sorted_phases) - 1:
+                p1 = sorted_phases[i]
+                p2 = sorted_phases[i + 1]
+
+                # Check for Stance -> Swing pattern
+                is_stance_swing = (p1.phase_type == PhaseType.STANCE and p2.phase_type == PhaseType.SWING)
+
+                # Check continuity -> 1 frame tolerance
+                is_continuous = (p2.start_frame - p1.end_frame) <= 1
+
+                if is_stance_swing and is_continuous:
+                    start = int(p1.start_frame)
+                    end = int(p2.end_frame)
+
+                    in_valid_range = False
+                    if not valid_ranges:
+                        in_valid_range = True
+                    else:
+                        for v_start, v_end in valid_ranges:
+                            if start >= v_start and end <= v_end:
+                                in_valid_range = True
+                                break
+
+                    if in_valid_range:
+                        # Extract signal segment
+                        raw_cycle = signal[start: end + 1]
+                        raw_cycle = [r for r in raw_cycle if r is not None]
+
+                        if len(raw_cycle) > 5:
+                            # Normalize to 100 points
+                            x_orig = np.linspace(0, 1, len(raw_cycle))
+                            interp = interp1d(x_orig, raw_cycle, kind='linear')
+                            normalized = interp(np.linspace(0, 1, 100))
+                            cycles.append(normalized)
+
+                    # Skip p2 because it was used as the second half of this cycle
+                    i += 1
+
+                i += 1
+            return cycles
+
+        # Process each kinematic signal
         for key, signal in kinematics.items():
-            side = angle_to_side.get(key)
+            # Determine side from key name
+            side = "left" if "LEFT" in key else "right" if "RIGHT" in key else None
             if not side: continue
 
-            heel_strikes = hs_map[side]
-            cycles_list = []
+            phases_to_use = l_phases if side == "left" else r_phases
 
-            # Cut signal between consecutive Heel Strikes
-            for i in range(len(heel_strikes) - 1):
-                start = heel_strikes[i]
-                end = heel_strikes[i + 1]
+            # Extract
+            raw_cycles_list = extract_cycles_from_phases(phases_to_use, signal)
 
-                raw_cycle = signal[start: end]
-                raw_cycle = [r for r in raw_cycle if r is not None]
+            processed_cycles = []
+            for cyc in raw_cycles_list:
+                # HS -> must be positive
+                # If negative, it means direction detection was wrong for this segment -> Flip.
+                if "HIP" in key:
+                    start_val = np.mean(cyc[:10])  # Check start of cycle
+                    if start_val < 0:
+                        cyc *= -1.0
 
-                if len(raw_cycle) < 5:
-                    continue
+                processed_cycles.append(cyc)
 
-                # Interpolate to exactly 100 points
-                x_original = np.linspace(0, 1, len(raw_cycle))
-                interpolator = interp1d(x_original, raw_cycle, kind='linear')
-
-                x_target = np.linspace(0, 1, 100)
-                normalized_cycle = interpolator(x_target)
-                cycles_list.append(normalized_cycle)
-
-            if cycles_list:
-                stack = np.vstack(cycles_list)
+            # Compute Mean/Std if we have data
+            if processed_cycles:
+                stack = np.vstack(processed_cycles)
                 stats[key] = {
                     "mean": np.mean(stack, axis=0).tolist(),
                     "std": np.std(stack, axis=0).tolist(),
-                    "n_cycles": len(cycles_list)
+                    "n_cycles": len(processed_cycles)
                 }
+
         return stats
 
     @staticmethod
     def _serialize_phase(p):
+        """Serializes a GaitPhase object to a dictionary."""
         return {
             "type": str(p.phase_type),
             "start": int(p.start_frame),
@@ -635,6 +921,7 @@ class GaitAnalyzer:
 
     @staticmethod
     def _serialize_support(p):
+        """Serializes a SupportPhase object to a dictionary."""
         return {
             "type": str(p.support_type),
             "start": int(p.start_frame),
