@@ -19,6 +19,7 @@ from gaitDetectNN.tools.inference import run_nn_inference
 from utils.visualizer import GaitVisualizer
 from utils.analysis import GaitAnalyzer
 from utils.plotting import GaitPlotter
+from utils.report_generator import ReportGenerator
 
 def load_yaml(path):
     with open(path, 'r') as f:

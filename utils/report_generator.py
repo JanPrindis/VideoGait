@@ -1,3 +1,9 @@
+"""
+This module handles the generation of comprehensive gait analysis reports.
+
+It supports multiple output formats (HTML, PDF, Interactive HTML) and uses Jinja2 templates
+to render analysis results, metadata, and visualizations into a polished document.
+"""
 import os
 import json
 import datetime
@@ -5,7 +11,6 @@ import pathlib
 import sys
 
 import yaml
-from PIL import Image
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from weasyprint import HTML
@@ -16,7 +21,18 @@ if str(project_root) not in sys.path:
 
 
 class ReportGenerator:
+    """
+    Generates reports (HTML, PDF, Interactive) from gait analysis data.
+    """
     def __init__(self, app_config: dict, output_dir: str, template_dir: str = "./templates"):
+        """
+        Initializes the report generator.
+
+        Args:
+            app_config (dict): Application configuration dictionary.
+            output_dir (str): Directory where reports will be saved.
+            template_dir (str, optional): Directory containing Jinja2 templates. Defaults to "./templates".
+        """
         self.app_config = app_config
         self.output_dir = output_dir
         self.template_dir = template_dir
@@ -35,6 +51,7 @@ class ReportGenerator:
 
     @staticmethod
     def _load_yaml(rel_path):
+        """Helper to safely load a YAML file relative to the project root."""
         try:
             full_path = project_root / rel_path
             if full_path.exists():
@@ -45,6 +62,10 @@ class ReportGenerator:
         return {}
 
     def _extract_config_metadata(self):
+        """
+        Extracts metadata about the models used (Pose Detector, Event Detector)
+        from the application configuration for display in the report.
+        """
         meta = {
             "pose_model": "Unknown",
             "event_method": "Unknown",
@@ -88,6 +109,7 @@ class ReportGenerator:
 
     @staticmethod
     def _format_float_safe(value, precision=2):
+        """Jinja2 filter to format floats safely, handling None values."""
         try:
             if value is None:
                 return "-"
@@ -97,6 +119,10 @@ class ReportGenerator:
             return "-"
 
     def _resolve_image_path(self, filename: str, search_dir: str):
+        """
+        Resolves the path to an image file for inclusion in the report.
+        Handles relative paths for HTML and absolute URIs for PDF generation.
+        """
         if not filename:
             return None
 
@@ -115,6 +141,7 @@ class ReportGenerator:
         return None
 
     def _discover_videos(self, video_dir: str):
+        """Scans the video directory for valid video files to include in the report."""
         videos = []
         if not video_dir or not os.path.exists(video_dir):
             return videos
@@ -140,6 +167,10 @@ class ReportGenerator:
 
     @staticmethod
     def _group_phases(phases, valid_ranges):
+        """
+        Groups detected gait phases into clips based on valid analysis ranges.
+        Useful for displaying phases per clip in the report.
+        """
         if not phases:
             return []
 
@@ -171,6 +202,15 @@ class ReportGenerator:
                graphs_dir: str = None,
                video_dir: str = None,
                filename_base: str = "gait_report"):
+        """
+        Generates and saves the report in the configured format.
+
+        Args:
+            analysis_source (str | dict): Path to analysis JSON or the data dictionary itself.
+            graphs_dir (str, optional): Directory containing generated plots. Defaults to output_dir.
+            video_dir (str, optional): Directory containing processed videos. Defaults to output_dir.
+            filename_base (str, optional): Base filename for the report. Defaults to "gait_report".
+        """
 
         # Get export type from app config
         output_type = self.app_config.get("visualization", {}).get("text_output_type", "pdf").lower()
@@ -214,6 +254,7 @@ class ReportGenerator:
 
         sort_order = {"Hip": 1, "Knee": 2, "Ankle": 3}
         sorted_joints = sorted(list(available_joints), key=lambda x: sort_order.get(x, 99))
+        all_videos = self._discover_videos(vid_search_path)
 
         # Context
         context = {
@@ -223,7 +264,7 @@ class ReportGenerator:
             "date": datetime.datetime.now().strftime("%d.%m.%Y %H:%M"),
             "has_kinematics": len(sorted_joints) > 0,
             "joints": sorted_joints,
-            "videos": self._discover_videos(vid_search_path),
+            "videos": all_videos,
             "img": {
                 "gantt": self._resolve_image_path("01_gantt_chart.png", img_search_path),
                 "pie": self._resolve_image_path("01_phases_pie_triple.png", img_search_path),
@@ -260,6 +301,25 @@ class ReportGenerator:
                 # Send to WeasyPrint
                 HTML(string=pdf_html_content, base_url=self.output_dir).write_pdf(pdf_path)
                 print(f"[Report] Saved PDF: {pdf_path}")
+
+            elif output_type == "interactive":
+
+                # Filter out videos - if < 3, use all, if all 4 are loaded, ignore the original
+                if len(all_videos) >= 4:
+                    keywords = ['inspection', 'kinematics', 'logic', 'overlay']
+                    filtered_videos = [v for v in all_videos if any(k in v['filename'].lower() for k in keywords)]
+                    if filtered_videos:
+                        context['videos'] = filtered_videos[:3]
+
+                print("[Report] Rendering Interactive Dashboard (Plotly)...")
+                template = self.env.get_template("report_html_interactive.html")
+                html_content = template.render(**context)
+
+                # Save as _interactive.html
+                html_path = os.path.join(self.output_dir, f"{filename_base}_interactive.html")
+                with open(html_path, "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                print(f"[Report] Saved Interactive HTML: {html_path}")
 
         except Exception as e:
             print(f"[Error] Report generation failed: {e}")

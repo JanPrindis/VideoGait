@@ -37,7 +37,7 @@ event_detector:
 
 # Visualization
 visualization:
-  text_output_type: "pdf" # pdf / md / console
+  text_output_type: "interactive" # pdf / md / console
   event_detector_debug_plots: true  # Save debug plots of gait event detector (for validation, or fine-tuning)
 
   # Video visualization
