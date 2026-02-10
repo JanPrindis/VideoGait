@@ -115,7 +115,7 @@ class GaitAnalyzer:
 
         report = {
             "metadata": {
-                "file": filename,
+                "file": os.path.splitext(os.path.basename(filename))[0],
                 "framerate": framerate,
                 "leg_length_px": leg_length_px,
                 "valid_ranges": valid_ranges
