@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Gait Analysis Report</title>
+    <style>
+        /* --- RESET & FONTS --- */
+        @page {
+            size: A4;
+            margin: 1.5cm;
+            @bottom-center { content: "Page " counter(page); font-size: 9pt; color: #888; }
+        }
+        body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 10pt; line-height: 1.3; color: #222; margin: 0; padding: 0; }
+
+        /* --- TYPOGRAPHY --- */
+        h1 { font-size: 20pt; text-align: center; text-transform: uppercase; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; margin-bottom: 20px; }
+
+        h2 {
+            font-size: 16pt; background-color: #2c3e50; color: #fff; padding: 6px 12px;
+            margin-top: 0; margin-bottom: 15px; border-radius: 2px;
+            page-break-after: avoid; page-break-before: always;
+        }
+        h2.first { page-break-before: auto; margin-top: 30px; }
+
+        h3 { font-size: 12pt; color: #2980b9; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-top: 10px; margin-bottom: 10px; page-break-after: avoid; }
+        h4 { font-size: 9pt; font-weight: bold; color: #555; margin: 8px 0 4px 0; text-transform: uppercase; page-break-after: avoid; }
+
+        .meta-table { width: 100%; border: none; margin-bottom: 20px; background-color: #f8f9fa; padding: 10px; }
+        .meta-table td { padding: 4px 10px; font-size: 9pt; }
+
+        /* --- LAYOUT --- */
+        .container { width: 100%; }
+        .row { display: flex; flex-wrap: wrap; width: 100%; margin-bottom: 15px; page-break-inside: avoid; }
+
+        .col-100 { width: 100%; flex: 0 0 100%; }
+        .col-50 { width: 48%; flex: 0 0 48%; margin-right: 2%; }
+        .col-50:last-child { margin-right: 0; }
+
+        /* Stats & Graph Split - 48% / 48% */
+        .col-stats { width: 48%; margin-right: 2%; flex: 0 0 48%; }
+        .col-graph { width: 48%; flex: 0 0 48%; text-align: center; }
+
+        /* Images - Standard sizing without DPI scaling */
+        img { max-width: 100%; height: auto; display: block; margin: 0 auto; border: none; }
+        .caption { text-align: center; font-style: italic; font-size: 8pt; color: #777; margin-bottom: 10px; }
+
+        /* --- TABLES --- */
+        table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 10px; page-break-inside: avoid; }
+        th { background-color: #e9ecef; font-weight: bold; padding: 5px; border: 1px solid #ccc; text-align: center; }
+        td { padding: 4px; border: 1px solid #eee; text-align: center; }
+        tr:nth-child(even) { background-color: #fcfcfc; }
+
+        .text-left { text-align: left; padding-left: 8px; }
+        .highlight { font-weight: bold; color: #2980b9; }
+        .compact-header th { font-size: 8pt; padding: 3px; }
+
+        /* --- UTILS --- */
+        .page-break { page-break-before: always; }
+        .joint-section { page-break-before: always; }
+        .no-print { display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>Gait Analysis Report</h1>
+
+    <table class="meta-table">
+        <tr>
+            <td class="text-left" style="width: 25%;"><strong>File:</strong> {{ meta.get('file', 'Unknown') }}</td>
+            <td style="width: 25%;"><strong>Date:</strong> {{ date }}</td>
+            <td style="width: 25%;"><strong>FPS:</strong> {{ meta.get('framerate', '-') }}</td>
+            <td style="width: 25%;"><strong>Leg Length:</strong> {{ meta.get('leg_length_px', 0)|fmt(1) }} px</td>
+        </tr>
+        <tr>
+            <td colspan="2"><strong>Pose Detector:</strong> {{ config.pose_model }}</td>
+            <td colspan="2"><strong>Model/Algorithm:</strong> {{ config.event_model_details }}</td>
+        </tr>
+    </table>
+
+    <h2 class="first">1. Spatiotemporal Parameters</h2>
+
+    <div class="row">
+        <div class="col-100">
+            <table>
+                <thead>
+                    <tr><th class="text-left">Metric</th><th>Left</th><th>Right</th><th>Global</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td class="text-left">Stance Time (s)</td><td>{{ d.spatiotemporal.left.stance_time_avg|fmt(2) }}</td><td>{{ d.spatiotemporal.right.stance_time_avg|fmt(2) }}</td><td>-</td></tr>
+                    <tr><td class="text-left">Swing Time (s)</td><td>{{ d.spatiotemporal.left.swing_time_avg|fmt(2) }}</td><td>{{ d.spatiotemporal.right.swing_time_avg|fmt(2) }}</td><td>-</td></tr>
+                    <tr><td class="text-left">Step Count</td><td>{{ d.spatiotemporal.left.step_count }}</td><td>{{ d.spatiotemporal.right.step_count }}</td><td class="highlight">{{ d.spatiotemporal.global.total_steps }}</td></tr>
+                    <tr><td class="text-left">Step Length (%LL)</td><td>{{ d.spatial.left.step_length_avg_percent|fmt(1) }}</td><td>{{ d.spatial.right.step_length_avg_percent|fmt(1) }}</td><td>{{ d.spatial.global.step_length_avg_percent|fmt(1) }}</td></tr>
+                    <tr><td class="text-left"><strong>Velocity (%LL/s)</strong></td><td>-</td><td>-</td><td class="highlight">{{ d.spatial.global.velocity_percent_per_sec|fmt(1) }}</td></tr>
+                    <tr><td class="text-left"><strong>Cadence (step/min)</strong></td><td>-</td><td>-</td><td class="highlight">{{ d.spatiotemporal.global.cadence|fmt(1) }}</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row"><div class="col-100">{% if img.pie %}<img src="{{ img.pie }}" style="max-height: 220px;"><div class="caption">Phase Ratios</div>{% endif %}</div></div>
+    <div class="row"><div class="col-100">{% if img.gantt %}<img src="{{ img.gantt }}" style="max-height: 180px;"><div class="caption">Temporal Sequence</div>{% endif %}</div></div>
+
+    <h2 style="page-break-before: auto; margin-top: 30px;">2. Coordination</h2>
+    <div class="row">
+        {% if 'Hip' in joints and 'Knee' in joints %}
+        <div class="col-50">{% set hk=img.cyclogram('hip','knee') %}{% if hk %}<img src="{{ hk }}"><div class="caption">Hip-Knee</div>{% endif %}</div>
+        {% endif %}
+        {% if 'Knee' in joints and 'Ankle' in joints %}
+        <div class="col-50">{% set ka=img.cyclogram('knee','ankle') %}{% if ka %}<img src="{{ ka }}"><div class="caption">Knee-Ankle</div>{% endif %}</div>
+        {% endif %}
+    </div>
+
+    <h2>3. Joint Kinematics</h2>
+
+    {% for joint in joints %}
+        <div class="joint-section {% if loop.first %}first{% endif %}" style="margin-bottom: 30px;">
+            {% if loop.first %}<style>.joint-section.first { page-break-before: auto; }</style>{% endif %}
+
+            <h3>{{ joint | upper }} JOINT</h3>
+
+            <div class="row">
+                <div class="col-stats">
+                    <h4>Global Summary</h4>
+                    <table class="compact-header">
+                        <thead>
+                            <tr>
+                                <th class="text-left">Metric</th>
+                                <th style="background:#d6eaf8; color: #154360; border-color: #a9cce3;">L Stance</th>
+                                <th style="background:#d6eaf8; color: #154360; border-color: #a9cce3;">L Swing</th>
+                                <th style="background:#fadbd8; color: #78281f; border-color: #f5b7b1;">R Stance</th>
+                                <th style="background:#fadbd8; color: #78281f; border-color: #f5b7b1;">R Swing</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set ls = d.detailed_statistics.left.get(joint, {}).get('summary', {}).get('Stance', {}) %}
+                            {% set rs = d.detailed_statistics.right.get(joint, {}).get('summary', {}).get('Stance', {}) %}
+                            {% set lsw = d.detailed_statistics.left.get(joint, {}).get('summary', {}).get('Swing', {}) %}
+                            {% set rsw = d.detailed_statistics.right.get(joint, {}).get('summary', {}).get('Swing', {}) %}
+
+                            <tr><td class="text-left">Duration (s)</td><td>{{ ls.avg_duration|fmt(2) }}</td><td>{{ lsw.avg_duration|fmt(2) }}</td><td>{{ rs.avg_duration|fmt(2) }}</td><td>{{ rsw.avg_duration|fmt(2) }}</td></tr>
+                            <tr><td class="text-left">Mean (°)</td><td>{{ ls.avg_mean|fmt(1) }}</td><td>{{ lsw.avg_mean|fmt(1) }}</td><td>{{ rs.avg_mean|fmt(1) }}</td><td>{{ rsw.avg_mean|fmt(1) }}</td></tr>
+                            <tr><td class="text-left">Range (ROM)</td><td>{{ ls.avg_rom|fmt(1) }}</td><td>{{ lsw.avg_rom|fmt(1) }}</td><td>{{ rs.avg_rom|fmt(1) }}</td><td>{{ rsw.avg_rom|fmt(1) }}</td></tr>
+                            <tr><td class="text-left">Min (°)</td><td>{{ ls.abs_min|fmt(0) }}</td><td>{{ lsw.abs_min|fmt(0) }}</td><td>{{ rs.abs_min|fmt(0) }}</td><td>{{ rsw.abs_min|fmt(0) }}</td></tr>
+                            <tr><td class="text-left">Max (°)</td><td>{{ ls.abs_max|fmt(0) }}</td><td>{{ lsw.abs_max|fmt(0) }}</td><td>{{ rs.abs_max|fmt(0) }}</td><td>{{ rsw.abs_max|fmt(0) }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="col-graph">
+                    {% if img.cycle(joint) %}
+                        <img src="{{ img.cycle(joint) }}" alt="Cycle" style="max-height: 250px;">
+                        <div class="caption">Average Cycle</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-100">
+                    {% if img.symmetry(joint) %}<img src="{{ img.symmetry(joint) }}" style="max-height: 280px;"><div class="caption">Symmetry Overlay</div>{% endif %}
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-100">
+                    <table>
+                        <thead><tr><th class="text-left">Phase History</th><th>Frames</th><th>Duration (s)</th><th>Mean</th><th>Range</th></tr></thead>
+<tbody>
+                            {% set l_groups = d.detailed_statistics.left.get(joint, {}).get('grouped_phases', []) %}
+                            {% set r_groups = d.detailed_statistics.right.get(joint, {}).get('grouped_phases', []) %}
+
+                            {% for i in range(l_groups|length) %}
+
+                                {% set group = l_groups[i] %}
+                                <tr>
+                                    <td colspan="5" class="text-left" style="background-color: #d6eaf8; color: #154360; font-weight: bold; border-top: 2px solid #a9cce3;">
+                                        LEFT - {{ group.name }}
+                                    </td>
+                                </tr>
+                                {% for p in group.phases %}
+                                <tr>
+                                    <td class="text-left">{{ p.type }}</td>
+                                    <td style="font-family: monospace; font-size: 8.5pt;">{{ p.frames[0] }}-{{ p.frames[1] }}</td>
+                                    <td>{{ p.duration|fmt(2) }}</td>
+                                    <td>{{ p.mean|fmt(1) }}</td>
+                                    <td>{{ p.range|fmt(1) }}</td>
+                                </tr>
+                                {% endfor %}
+
+                                {% if i < r_groups|length %}
+                                    {% set group = r_groups[i] %}
+                                    <tr>
+                                        <td colspan="5" class="text-left" style="background-color: #fadbd8; color: #78281f; font-weight: bold; border-top: 2px solid #f5b7b1;">
+                                            RIGHT - {{ group.name }}
+                                        </td>
+                                    </tr>
+                                    {% for p in group.phases %}
+                                    <tr>
+                                        <td class="text-left">{{ p.type }}</td>
+                                        <td style="font-family: monospace; font-size: 8.5pt;">{{ p.frames[0] }}-{{ p.frames[1] }}</td>
+                                        <td>{{ p.duration|fmt(2) }}</td>
+                                        <td>{{ p.mean|fmt(1) }}</td>
+                                        <td>{{ p.range|fmt(1) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-100">
+                    <h4>Kinematic Timeline</h4>
+                    {% if img.timeline('left', joint) %}<img src="{{ img.timeline('left', joint) }}" style="margin-bottom:5px;">{% endif %}
+                    {% if img.timeline('right', joint) %}<img src="{{ img.timeline('right', joint) }}">{% endif %}
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+
+    <h2>4. Stability</h2>
+
+    <div class="row">
+        <div class="col-100">
+             {% if d.com_analysis.statistics %}
+             <table style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Mean Height</th>
+                        <th style="width: 20%;">Min Height</th>
+                        <th style="width: 20%;">Max Height</th>
+                        <th style="width: 20%;">Vertical Range</th>
+                        <th style="width: 20%;">Stability (Std)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ d.com_analysis.statistics.mean_height_percent|fmt(1) }} %</td>
+                        <td>{{ d.com_analysis.statistics.min_height_percent|fmt(1) }} %</td>
+                        <td>{{ d.com_analysis.statistics.max_height_percent|fmt(1) }} %</td>
+                        <td class="highlight">{{ d.com_analysis.statistics.vertical_excursion_range|fmt(1) }} %</td>
+                        <td>{{ d.com_analysis.statistics.std_dev|fmt(2) }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row"><div class="col-100">{% if img.com %}<img src="{{ img.com }}"><div class="caption">Vertical Excursion</div>{% endif %}</div></div>
+
+</body>
+</html>

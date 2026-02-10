@@ -170,5 +170,22 @@ def main():
     plotter = GaitPlotter(str(output_dir / "plots"))
     plotter.generate_plots_from_json(str(output_dir / "analysis.json"))
 
+    print("-" * 30)
+
+    # --- EXPORT ---
+    # TODO: Annoying setup - document: https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation
+    report_generator = ReportGenerator(
+        app_config=app_config,
+        output_dir=str(output_dir),
+    )
+
+    report_generator.export(
+        analysis_source=analysis_report,
+        graphs_dir=str(output_dir / "plots"),
+        video_dir=str(output_dir),
+        filename_base=f"{an_name}_report"
+    )
+
+
 if __name__ == "__main__":
     main()
