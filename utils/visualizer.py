@@ -516,4 +516,4 @@ class GaitVisualizer:
     def _create_writer(root, stem, suffix, fps, size):
         """Creates a VideoWriter instance for output."""
         path = root / f"{stem}_{suffix}.mp4"
-        return cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*'mp4v'), fps, size)
+        return cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*'av1c'), fps, size)
