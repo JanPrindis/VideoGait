@@ -17,10 +17,13 @@ import matplotlib.patches as mpatches
 # Styling
 plt.style.use('seaborn-v0_8-whitegrid')
 plt.rcParams.update({
-    'font.size': 10,
-    'axes.titlesize': 11,
-    'axes.labelsize': 9,
-    'lines.linewidth': 2.0,
+    'font.size': 12,
+    'axes.titlesize': 16,
+    'axes.labelsize': 14,
+    'xtick.labelsize': 12,
+    'ytick.labelsize': 12,
+    'legend.fontsize': 12,
+    'lines.linewidth': 2.5,
     'axes.grid': True,
     'grid.alpha': 0.3,
     'figure.autolayout': False,
@@ -128,7 +131,7 @@ class GaitPlotter:
         Generates pie charts visualizing the Stance/Swing ratio for each leg
         and the Single/Double support ratio.
         """
-        fig, axes = plt.subplots(1, 3, figsize=(9, 3))
+        fig, axes = plt.subplots(1, 3, figsize=(10, 4)) # Increased figsize slightly
 
         # Left and Right
         for ax, side in zip(axes[:2], ['left', 'right']):
@@ -141,7 +144,8 @@ class GaitPlotter:
                        labels=[f'Stance\n{st:.2f}s', f'Swing\n{sw:.2f}s'],
                        colors=[self.colors['pie_stance'], self.colors['pie_swing']],
                        autopct='%1.0f%%', startangle=90, pctdistance=0.85,
-                       wedgeprops=dict(width=0.4))
+                       wedgeprops=dict(width=0.4),
+                       textprops={'fontsize': 11}) # Explicit text size for pies
                 ax.set_title(f"{side.capitalize()} Leg")
             else:
                 ax.text(0.5, 0.5, "No Data", ha='center')
@@ -158,20 +162,21 @@ class GaitPlotter:
                    labels=[f'Single\n{sin:.1f}s', f'Double\n{dbl:.1f}s'],
                    colors=[self.colors['pie_single'], self.colors['pie_double']],
                    autopct='%1.0f%%', startangle=90, pctdistance=0.85,
-                   wedgeprops=dict(width=0.4))
+                   wedgeprops=dict(width=0.4),
+                   textprops={'fontsize': 11})
             ax.set_title("Support Ratio")
         else:
             ax.text(0.5, 0.5, "No Data", ha='center')
             ax.axis('off')
 
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, "01_phases_pie_triple.png"), dpi=150)
+        # bbox_inches='tight' trims the white borders
+        plt.savefig(os.path.join(self.output_dir, "01_phases_pie_triple.png"), dpi=150, bbox_inches='tight', pad_inches=0.1)
         plt.close()
 
     def _plot_gantt(self, phases_data, valid_ranges):
         """
-        Creates a compact Gantt chart showing the temporal progression of gait phases
-        (Stance/Swing) for both legs and the resulting support phases.
+        Creates a compact Gantt chart showing the temporal progression of gait phases.
         """
 
         # If no valid ranges defined -> use full video
@@ -182,7 +187,7 @@ class GaitPlotter:
                     max_f = max(max_f, max(p['end'] for p in phases_data[side]))
             valid_ranges = [(0, max_f)]
 
-        fig, axes = self._create_broken_axis_fig(valid_ranges, figsize=(14, 3))
+        fig, axes = self._create_broken_axis_fig(valid_ranges, figsize=(15, 3.5)) # Slightly wider/taller
         bar_h = 1.0
 
         for ax_idx, (ax, (v_start, v_end)) in enumerate(zip(axes, valid_ranges)):
@@ -216,8 +221,7 @@ class GaitPlotter:
         axes[0].set_yticks([0.5, 1.5, 2.5])
         axes[0].set_yticklabels(['Support', 'Right Leg', 'Left Leg'])
 
-        # Tile
-        fig.suptitle("Gait Phases Timeline", fontsize=12, y=0.98)
+        fig.suptitle("Gait Phases Timeline", fontsize=16, y=1.05) # Moved title up slightly
 
         patches = [
             mpatches.Patch(color=self.colors['gantt_stance'], label='Stance'),
@@ -227,26 +231,27 @@ class GaitPlotter:
             mpatches.Patch(color=self.colors['gantt_single_r'], label='Single R')
         ]
 
-        # Legend
-        fig.legend(handles=patches, loc='upper center', bbox_to_anchor=(0.5, 0.90), ncol=5, frameon=False, fontsize=9)
-        plt.subplots_adjust(top=0.80, bottom=0.15, left=0.08, right=0.98)
+        # Legend Position
+        fig.legend(handles=patches, loc='upper center', bbox_to_anchor=(0.5, 0.96), ncol=5, frameon=False)
 
-        fig.text(0.5, 0.04, 'Frame Number', ha='center')
+        # Adjust margins to give space for X-axis label and Legend
+        plt.subplots_adjust(top=0.82, bottom=0.20, left=0.08, right=0.98)
 
-        plt.savefig(os.path.join(self.output_dir, "01_gantt_chart.png"), dpi=150)
+        fig.text(0.5, 0.02, 'Frame Number', ha='center', fontsize=12)
+
+        plt.savefig(os.path.join(self.output_dir, "01_gantt_chart.png"), dpi=150, bbox_inches='tight', pad_inches=0.1)
         plt.close()
 
     def _plot_avg_gait_cycles(self, stats):
         """
-        Plots the average kinematic trajectories (Hip, Knee, Ankle angles) over a normalized gait cycle (0-100%).
-        Includes standard deviation shading.
+        Plots the average kinematic trajectories.
         """
         joints = {"Hip": ["SHOULDER", "HIP", "KNEE"],
                   "Knee": ["HIP", "KNEE", "ANKLE"],
                   "Ankle": ["KNEE", "ANKLE", "FOOT"]}
 
         for j_name, kws in joints.items():
-            fig, ax = plt.subplots(figsize=(5, 4))
+            fig, ax = plt.subplots(figsize=(6, 5)) # Slightly larger
             has_data = False
 
             for key, val in stats.items():
@@ -256,17 +261,17 @@ class GaitPlotter:
                     s = np.array(val["std"])
                     x = np.linspace(0, 100, len(m))
 
-                    ax.plot(x, m, color=self.colors[side], label=side.capitalize(), lw=2)
+                    ax.plot(x, m, color=self.colors[side], label=side.capitalize(), lw=3) # Thicker line
                     ax.fill_between(x, m - s, m + s, color=self.colors[side], alpha=0.15)
                     has_data = True
 
             if has_data:
-                ax.set_title(f"Average {j_name} Cycle")
+                ax.set_title(f"Avg {j_name} Cycle")
                 ax.set_xlabel("% Gait Cycle")
                 ax.set_ylabel("Angle (°)")
-                ax.legend()
+                ax.legend(loc='upper right')
                 plt.tight_layout()
-                plt.savefig(os.path.join(self.output_dir, f"01_avg_cycle_{j_name.lower()}.png"), dpi=150)
+                plt.savefig(os.path.join(self.output_dir, f"01_avg_cycle_{j_name.lower()}.png"), dpi=150, bbox_inches='tight', pad_inches=0.1)
             plt.close()
 
     # =========================================================================
@@ -275,8 +280,7 @@ class GaitPlotter:
 
     def _plot_leg_timeline_separated(self, data, side):
         """
-        Plots the raw kinematic angles for a specific leg over time, overlaid with
-        background colors representing the detected gait phases.
+        Plots the raw kinematic angles timeline with phase background.
         """
         raw_kps = data.get("raw_kinematics", {})
         phases = data.get("gait_phases", {}).get(side, [])
@@ -296,7 +300,7 @@ class GaitPlotter:
         for joint_name, joint_keys in keys_map.items():
             if not joint_keys: continue
 
-            fig, axes = self._create_broken_axis_fig(valid_ranges, figsize=(12, 3))
+            fig, axes = self._create_broken_axis_fig(valid_ranges, figsize=(14, 3.5))
 
             # Iterate over each "clip" (subplot)
             for ax_idx, (ax, (v_start, v_end)) in enumerate(zip(axes, valid_ranges)):
@@ -324,26 +328,23 @@ class GaitPlotter:
                         signal_segment = signal_full[s_idx:e_idx]
 
                         x_frames = np.arange(s_idx, e_idx)
-                        ax.plot(x_frames, signal_segment, color=self.colors[side], lw=1.5)
+                        ax.plot(x_frames, signal_segment, color=self.colors[side], lw=2.0)
 
                 self._style_broken_axis_subplot(ax, ax_idx, len(valid_ranges), v_start, v_end)
 
-            # Global Labels
-            fig.suptitle(f"{side.capitalize()} {joint_name} Angle (Valid Ranges Only)", fontsize=11, y=0.95)
-
-            # Common Y label
+            fig.suptitle(f"{side.capitalize()} {joint_name} Angle", fontsize=16, y=0.98)
             axes[0].set_ylabel("Angle (°)")
 
             # Legend
             patches = [mpatches.Patch(color=self.colors["stance_bg"], label='Stance'),
                        mpatches.Patch(color=self.colors["swing_bg"], label='Swing')]
-            axes[-1].legend(handles=patches, loc='upper right', frameon=True, framealpha=1.0, fontsize=8)
+            axes[-1].legend(handles=patches, loc='upper right', frameon=True, framealpha=1.0)
 
-            # X label
-            fig.text(0.5, 0.02, 'Frame Number', ha='center')
+            fig.text(0.5, 0.02, 'Frame Number', ha='center', fontsize=12)
 
-            plt.subplots_adjust(top=0.85, bottom=0.20, right=0.98, left=0.08)
-            plt.savefig(os.path.join(self.output_dir, f"02_detail_{side}_{joint_name.lower()}.png"), dpi=150)
+            # Adjust bottom to make room for larger X label
+            plt.subplots_adjust(top=0.85, bottom=0.22, right=0.98, left=0.06)
+            plt.savefig(os.path.join(self.output_dir, f"02_detail_{side}_{joint_name.lower()}.png"), dpi=150, bbox_inches='tight', pad_inches=0.1)
             plt.close()
 
     # =========================================================================
@@ -352,8 +353,7 @@ class GaitPlotter:
 
     def _plot_symmetry_overlay(self, data, joint_name, keywords):
         """
-        Plots the raw kinematic angles of both legs on the same graph to visualize symmetry.
-        Includes background coloring for support phases (Single L/R, Double).
+        Plots the raw kinematic angles of both legs on the same graph.
         """
         raw_kps = data.get("raw_kinematics", {})
         phases = data.get("gait_phases", {}).get("support", [])
@@ -367,7 +367,7 @@ class GaitPlotter:
             total_len = len(list(raw_kps.values())[0])
             valid_ranges = [(0, total_len - 1)]
 
-        fig, axes = self._create_broken_axis_fig(valid_ranges, figsize=(12, 4))
+        fig, axes = self._create_broken_axis_fig(valid_ranges, figsize=(14, 4.5)) # Taller for readability
 
         for ax_idx, (ax, (v_start, v_end)) in enumerate(zip(axes, valid_ranges)):
 
@@ -378,37 +378,28 @@ class GaitPlotter:
                 e_r = min(p['end'], v_end)
 
                 stype = p['type'].lower()
-                if "double" in stype:
-                    col = self.colors["double_bg"]
-                elif "left" in stype:
-                    col = self.colors["single_left_bg"]
-                elif "right" in stype:
-                    col = self.colors["single_right_bg"]
-                else:
-                    col = "white"
-
+                if "double" in stype: col = self.colors["double_bg"]
+                elif "left" in stype: col = self.colors["single_left_bg"]
+                elif "right" in stype: col = self.colors["single_right_bg"]
+                else: col = "white"
                 ax.axvspan(s_r, e_r, color=col, alpha=0.7, lw=0)
 
             # Signals
             for k in l_keys:
                 full = np.array(raw_kps[k])
-                s = max(0, v_start)
-                e = min(len(full), v_end + 1)
-
+                s, e = max(0, v_start), min(len(full), v_end + 1)
                 if s < e: ax.plot(np.arange(s, e), full[s:e], color=self.colors["left"],
-                                  label="Left" if ax_idx == 0 and k == l_keys[0] else "", lw=2)
+                                  label="Left" if ax_idx == 0 and k == l_keys[0] else "", lw=2.5)
 
             for k in r_keys:
                 full = np.array(raw_kps[k])
-                s = max(0, v_start)
-                e = min(len(full), v_end + 1)
-
+                s, e = max(0, v_start), min(len(full), v_end + 1)
                 if s < e: ax.plot(np.arange(s, e), full[s:e], color=self.colors["right"],
-                                  label="Right" if ax_idx == 0 and k == r_keys[0] else "", lw=2)
+                                  label="Right" if ax_idx == 0 and k == r_keys[0] else "", lw=2.5)
 
             self._style_broken_axis_subplot(ax, ax_idx, len(valid_ranges), v_start, v_end)
 
-        fig.suptitle(f"{joint_name} Symmetry (Left vs Right)", fontsize=12, y=0.96)
+        fig.suptitle(f"{joint_name} Symmetry (Left vs Right)", fontsize=16, y=0.98)
         axes[0].set_ylabel("Angle (°)")
 
         # Legend
@@ -416,10 +407,10 @@ class GaitPlotter:
                    mpatches.Patch(color=self.colors["right"], label="Right")]
         axes[-1].legend(handles=handles, loc="upper right", frameon=True, framealpha=1.0)
 
-        fig.text(0.5, 0.04, 'Frame Number', ha='center')
+        fig.text(0.5, 0.02, 'Frame Number', ha='center', fontsize=12)
 
-        plt.subplots_adjust(top=0.90, bottom=0.15, right=0.98, left=0.08)
-        plt.savefig(os.path.join(self.output_dir, f"03_symmetry_{joint_name.lower()}.png"), dpi=150)
+        plt.subplots_adjust(top=0.90, bottom=0.18, right=0.98, left=0.06)
+        plt.savefig(os.path.join(self.output_dir, f"03_symmetry_{joint_name.lower()}.png"), dpi=150, bbox_inches='tight', pad_inches=0.1)
         plt.close()
 
     # =========================================================================
@@ -437,14 +428,8 @@ class GaitPlotter:
         # If data is within this range, these limits are used
         # If data exceeds this range, the graph auto-expands (Soft Lock)
         std_ranges = {
-            "Hip-Knee": {
-                "x": [-20, 40],  # Hip
-                "y": [-10, 70]   # Knee
-            },
-            "Knee-Ankle": {
-                "x": [-10, 70],  # Knee
-                "y": [50, 100]   # Ankle
-            }
+            "Hip-Knee": {"x": [-20, 40], "y": [-10, 70]},
+            "Knee-Ankle": {"x": [-10, 70], "y": [50, 100]}
         }
 
         def find_key(j_kw, s_kw):
@@ -455,7 +440,7 @@ class GaitPlotter:
             return None
 
         for j1, j2, title in pairs:
-            fig, ax = plt.subplots(figsize=(5, 5))
+            fig, ax = plt.subplots(figsize=(6, 6)) # Square figure
             has_data = False
 
             all_x, all_y = [], []
@@ -468,19 +453,14 @@ class GaitPlotter:
                     # Close loop
                     v1 = np.append(v1, v1[0])
                     v2 = np.append(v2, v2[0])
-
-                    ax.plot(v1, v2, label=side.capitalize(), color=self.colors[side], lw=2.5, alpha=0.8)
-
-                    all_x.extend(v1)
-                    all_y.extend(v2)
+                    ax.plot(v1, v2, label=side.capitalize(), color=self.colors[side], lw=3.0, alpha=0.8)
+                    all_x.extend(v1); all_y.extend(v2)
                     has_data = True
 
             if has_data:
                 # Axis scaling
                 limits = std_ranges.get(title, {})
-                target_x = limits.get("x", [-20, 80])
-                target_y = limits.get("y", [-20, 80])
-
+                target_x, target_y = limits.get("x", [-20, 80]), limits.get("y", [-20, 80])
                 data_x_min, data_x_max = min(all_x), max(all_x)
                 data_y_min, data_y_max = min(all_y), max(all_y)
 
@@ -498,8 +478,7 @@ class GaitPlotter:
                 ax.set_title(f"{title} Cyclogram")
                 ax.legend(frameon=True, framealpha=1.0)
                 plt.tight_layout()
-                plt.savefig(os.path.join(self.output_dir, f"03_cyclogram_{j1.lower()}_{j2.lower()}.png"), dpi=150)
-
+                plt.savefig(os.path.join(self.output_dir, f"03_cyclogram_{j1.lower()}_{j2.lower()}.png"), dpi=150, bbox_inches='tight', pad_inches=0.1)
             plt.close()
 
     # =========================================================================
@@ -511,7 +490,6 @@ class GaitPlotter:
         Plots the vertical excursion of the Center of Mass (CoM) over time.
         Overlays background colors representing support phases (Single L/R, Double).
         """
-
         if not com_data: return
 
         if not valid_ranges:
@@ -523,7 +501,6 @@ class GaitPlotter:
         all_valid_points = []
 
         for ax_idx, (ax, (v_start, v_end)) in enumerate(zip(axes, valid_ranges)):
-            # Background support phases
             clip_phases = [p for p in support_phases if p['end'] >= v_start and p['start'] <= v_end]
             for p in clip_phases:
                 stype = p['type'].lower()
@@ -552,9 +529,7 @@ class GaitPlotter:
                 # Collect valid points for auto-scale logic
                 valid_seg = [v for v in segment if v is not None]
                 all_valid_points.extend(valid_seg)
-
-                # Plot
-                ax.plot(np.arange(s_idx, e_idx), segment, color=self.colors["com_line"], lw=2.0)
+                ax.plot(np.arange(s_idx, e_idx), segment, color=self.colors["com_line"], lw=2.5)
 
             self._style_broken_axis_subplot(ax, ax_idx, len(valid_ranges), v_start, v_end)
 
@@ -563,10 +538,7 @@ class GaitPlotter:
         target_min, target_max = 90, 130
 
         if all_valid_points:
-            data_min = min(all_valid_points)
-            data_max = max(all_valid_points)
-
-            # Expand limits if data exceeds the window, otherwise stick to window
+            data_min, data_max = min(all_valid_points), max(all_valid_points)
             final_min = min(target_min, data_min - 2)
             final_max = max(target_max, data_max + 2)
 
@@ -574,18 +546,18 @@ class GaitPlotter:
         else:
             axes[0].set_ylim(target_min, target_max)
 
-        fig.suptitle("Center of Mass Vertical Excursion", fontsize=11, y=0.95)
+        fig.suptitle("Center of Mass Vertical Excursion", fontsize=16, y=0.98)
         axes[0].set_ylabel("% Leg Length")
 
         # Legend
         handles = [mpatches.Patch(color=self.colors["double_bg"], label="Double Supp."),
                    mpatches.Patch(color=self.colors["single_left_bg"], label="Single L"),
                    mpatches.Patch(color=self.colors["single_right_bg"], label="Single R")]
-        axes[-1].legend(handles=handles, loc="upper right", frameon=True, framealpha=1.0, fontsize=8)
+        axes[-1].legend(handles=handles, loc="upper right", frameon=True, framealpha=1.0)
 
-        fig.text(0.5, 0.02, 'Frame Number', ha='center')
-        plt.subplots_adjust(top=0.85, bottom=0.20, right=0.98, left=0.08)
-        plt.savefig(os.path.join(self.output_dir, "02_detail_com_height.png"), dpi=150)
+        fig.text(0.5, 0.02, 'Frame Number', ha='center', fontsize=12)
+        plt.subplots_adjust(top=0.88, bottom=0.22, right=0.98, left=0.06)
+        plt.savefig(os.path.join(self.output_dir, "02_detail_com_height.png"), dpi=150, bbox_inches='tight', pad_inches=0.1)
         plt.close()
 
     # =========================================================================
