@@ -78,19 +78,26 @@ class GaitPlotter:
             "com_line": "#8e24aa",
         }
 
-    def generate_plots_from_json(self, json_path: str):
+    def generate_plots_from_json(self, analysis_source: str | dict):
         """
         Orchestrates the generation of all configured plots based on the provided JSON data.
 
         Args:
-            json_path (str): Path to the analysis results JSON file.
+            analysis_source (str | dict): Path to the analysis results JSON file or the data dictionary itself.
         """
-        if not os.path.exists(json_path): return
+        data = {}
+        source_name = "Data Dictionary"
 
-        with open(json_path, 'r') as f:
-            data = json.load(f)
+        if isinstance(analysis_source, str):
+            if not os.path.exists(analysis_source):
+                return
+            with open(analysis_source, 'r') as f:
+                data = json.load(f)
+            source_name = os.path.basename(analysis_source)
+        elif isinstance(analysis_source, dict):
+            data = analysis_source
 
-        print(f"[Plotter] Generating charts for {os.path.basename(json_path)}...")
+        print(f"[Plotter] Generating charts for {source_name}...")
 
         valid_ranges = data.get("metadata", {}).get("valid_ranges", [])
 

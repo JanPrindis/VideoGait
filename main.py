@@ -169,7 +169,7 @@ def main():
 
     # --- GENERATE PLOTS ---
     plotter = GaitPlotter(str(output_dir / "plots"))
-    plotter.generate_plots_from_json(str(output_dir / "analysis.json"))
+    plotter.generate_plots_from_json(analysis_source=analysis_report)
 
     print("-" * 30)
 
