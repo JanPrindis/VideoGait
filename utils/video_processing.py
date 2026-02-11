@@ -11,6 +11,7 @@ import numpy as np
 from matplotlib.pyplot import title
 from torch.nn import functional as F
 from tqdm import tqdm
+from utils.logger import log
 
 # old numpy compatibility (np.float -> float...)
 with warnings.catch_warnings():
@@ -189,8 +190,7 @@ def interpolate_minterpolate(input_video, output_video, target_fps=120):
     try:
         subprocess.run(command, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
-        print(f"Error interpolating {input_video}:")
-        print(e.stderr)
+        log("VIDEO", f"Error interpolating {input_video}:\n{e.stderr}", level="error")
 
 
 def get_video_fps(video_path):
@@ -208,11 +208,11 @@ def smart_interpolate(input_path, output_path, target_fps):
     # Float error tolerance
     EPS = 0.1
 
-    print(f"[SmartInterp] Input: {orig_fps:.2f} FPS | Target: {target_fps} FPS")
+    log("SMART_INTERP", f"Input: {orig_fps:.2f} FPS | Target: {target_fps} FPS", level="info")
 
     # SAME FPS -> COPY
     if abs(orig_fps - target_fps) < EPS:
-        print(f"[SmartInterp] FPS match, copying file.")
+        log("SMART_INTERP", "FPS match, copying file.", level="info")
         shutil.copy(input_path, output_path)
         return
 
@@ -226,7 +226,7 @@ def smart_interpolate(input_path, output_path, target_fps):
     # DIRECT RIFE
     if is_rife_compatible(orig_fps, target_fps):
         exp = int(round(math.log2(target_fps / orig_fps)))
-        print(f"[SmartInterp] Direct RIFE compatible (2^{exp}x). Executing...")
+        log("SMART_INTERP", f"Direct RIFE compatible (2^{exp}x). Executing...", level="info")
         RIFE_interpolate(video=input_path, output=output_path, exp=exp, fps=target_fps)
         return
 
@@ -249,7 +249,7 @@ def smart_interpolate(input_path, output_path, target_fps):
                 best_base = base
 
     if best_base is not None:
-        print(f"[SmartInterp] Hybrid Strategy: {orig_fps} -> minterpolate({best_base}) -> RIFE({target_fps})")
+        log("SMART_INTERP", f"Hybrid Strategy: {orig_fps} -> minterpolate({best_base}) -> RIFE({target_fps})", level="info")
 
         # Temp file path
         temp_file = output_path.replace(".mp4", f"_temp_{int(best_base)}.mp4")
@@ -257,7 +257,7 @@ def smart_interpolate(input_path, output_path, target_fps):
         try:
             # Minterpolate to the closest base
             if abs(orig_fps - best_base) > EPS:
-                print(f"  [Step 1] Minterpolate to {best_base} FPS...")
+                log("SMART_INTERP", f"  [Step 1] Minterpolate to {best_base} FPS...", level="info")
                 interpolate_minterpolate(input_path, temp_file, target_fps=int(best_base))
                 current_input = temp_file
             else:
@@ -266,7 +266,7 @@ def smart_interpolate(input_path, output_path, target_fps):
             # RIFE to target
             if abs(best_base - target_fps) > EPS:
                 exp = int(round(math.log2(target_fps / best_base)))
-                print(f"  [Step 2] RIFE 2^{exp}x to {target_fps} FPS...")
+                log("SMART_INTERP", f"  [Step 2] RIFE 2^{exp}x to {target_fps} FPS...", level="info")
                 RIFE_interpolate(video=current_input, output=output_path, exp=exp, fps=target_fps)
             else:
                 # If base is our target framerate, rename temp to final
@@ -282,5 +282,5 @@ def smart_interpolate(input_path, output_path, target_fps):
         return
 
     # FALLBACK
-    print(f"[SmartInterp] No clean path found. Brute-forcing minterpolate to {target_fps}.")
+    log("SMART_INTERP", f"No clean path found. Brute-forcing minterpolate to {target_fps}.", level="warning")
     interpolate_minterpolate(input_path, output_path, target_fps=target_fps)

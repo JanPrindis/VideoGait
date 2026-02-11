@@ -15,6 +15,7 @@ from utils.json_serializer import KeypointSerializer
 from utils.preprocessing import preprocess_keypoints
 from utils.gait_structs import GaitEventType, PhaseType
 from utils.config_utils import resolve_skeleton_from_config
+from utils.logger import log
 
 
 class GaitAnalyzer:
@@ -52,10 +53,10 @@ class GaitAnalyzer:
             
         """
         filename = os.path.basename(keypoints_path)
-        print(f"[Analyzer] Analyzing {filename}...")
+        log("ANALYZER", f"Analyzing {filename}...", level="info")
 
         if not os.path.exists(keypoints_path):
-            print(f"[Analyzer] Error: File {keypoints_path} not found.")
+            log("ANALYZER", f"Error: File {keypoints_path} not found.", level="error")
             return None
 
         # --- LOAD AND FILTER ---
@@ -136,7 +137,7 @@ class GaitAnalyzer:
         with open(out_path, 'w') as f:
             json.dump(report, f, indent=4)
 
-        print(f"[Analyzer] Report saved to {out_path}")
+        log("ANALYZER", f"Report saved to {out_path}", level="success")
         return report
 
     # -------------------------------------------------------------------------

@@ -6,6 +6,7 @@ from pathlib import Path
 from detectors import POSE_DETECTORS
 from ..base import BaseDetector
 from utils.json_serializer import KeypointSerializer
+from utils.logger import log
 
 
 @POSE_DETECTORS.register
@@ -21,9 +22,9 @@ class PoseLandmarker(BaseDetector):
         self.model_path = self.base_dir / "models" / model_filename
 
         if not self.model_path.exists():
-            print(f"[PoseLandmarker] Warning: Model not found at {self.model_path}")
+            log("PoseLandmarker", f"Warning: Model not found at {self.model_path}", level="warning")
 
-        print(f"[PoseLandmarker] Loading model: {self.model_path}")
+        log("PoseLandmarker", f"Loading model: {self.model_path}", level="info")
 
         # MediaPipe parameters
         self.min_bbox_size = self.config.get("min_bbox_size", 250)

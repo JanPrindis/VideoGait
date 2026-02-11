@@ -8,6 +8,7 @@ import yaml
 import os
 import detectors
 from utils.registry import POSE_DETECTORS
+from utils.logger import log
 
 
 def build_detector_from_file(config_path: str):
@@ -41,5 +42,5 @@ def build_detector_from_file(config_path: str):
 
     params = cfg_content.get("params", {})
 
-    print(f"Building detector: {detector_type} from {config_path}")
+    log("BUILDER", f"Building detector: {detector_type} from {config_path}", level="info")
     return detector_class(params)

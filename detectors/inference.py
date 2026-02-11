@@ -14,6 +14,7 @@ if str(project_root) not in sys.path:
 
 import detectors
 from detectors.builder import build_detector_from_file
+from utils.logger import log
 
 
 def resolve_path(path_str: str, root: Path):
@@ -84,7 +85,7 @@ def run_pose_extraction(app_config: dict, video_path: str, output_root: str = No
 
     # Safety check & Create
     if not final_out_path.exists():
-        print(f"[App] Creating output directory: {final_out_path}")
+        log("INFERENCE", f"Creating output directory: {final_out_path}", level="info")
         final_out_path.mkdir(parents=True, exist_ok=True)
 
     # Load detector config file
@@ -100,15 +101,15 @@ def run_pose_extraction(app_config: dict, video_path: str, output_root: str = No
         raise FileNotFoundError(f"Detector config not found: {det_config_path}")
 
     # Build & Run
-    print(f"[Detector] Building detector from: {det_config_path.name}")
+    log("DETECTOR", f"Building detector from: {det_config_path.name}", level="info")
     detector = build_detector_from_file(str(det_config_path))
 
-    print(f"[Detector] Processing: {vid_path.name}")
+    log("DETECTOR", f"Processing: {vid_path.name}", level="info")
     try:
         detector.detect(str(vid_path), str(final_out_path))
 
     except Exception as e:
-        print(f"[Detector] Critical Error: {e}")
+        log("DETECTOR", f"Critical Error: {e}", level="error")
         raise e
 
 
@@ -123,7 +124,7 @@ if __name__ == "__main__":
     cfg_path = resolve_path(args.config, project_root)
 
     if not cfg_path.exists():
-        print(f"Error: Config not found at {cfg_path}")
+        log("INFERENCE", f"Error: Config not found at {cfg_path}", level="error")
         sys.exit(1)
 
     with open(cfg_path, 'r') as f:

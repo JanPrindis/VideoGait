@@ -23,6 +23,7 @@ from skeletons import get_skeleton_by_name
 from utils.preprocessing import generate_features
 
 from utils.gait_structs import GaitEvent, GaitEventType
+from utils.logger import log
 
 EVENT_ORDER = ["Left Heel Strike", "Left Toe Off", "Right Heel Strike", "Right Toe Off"]
 
@@ -60,7 +61,7 @@ def load_train_config_and_model(experiment_path, checkpoint_name, input_size, de
 
     # Adjacency matrix injection
     if train_cfg['data'].get('requires_adj_matrix', False):
-        print("[Inference] 'requires_adj_matrix' is True -> Injecting feature config to model.")
+        log("INFERENCE", "'requires_adj_matrix' is True -> Injecting feature config to model.", level="info")
 
         features_cfg = train_cfg['data']['features']
 
@@ -71,11 +72,11 @@ def load_train_config_and_model(experiment_path, checkpoint_name, input_size, de
         train_cfg['model']['params']['skeleton_name'] = train_cfg['data']['skeleton']
 
     # Build model
-    print(f"[Model] Building architecture: {train_cfg['model']['type']} (Input Size: {input_size})")
+    log("INFERENCE", f"Building architecture: {train_cfg['model']['type']} (Input Size: {input_size})", level="info")
     model = build_model(train_cfg['model'], input_size=input_size)
 
     # Load weights
-    print(f"[Model] Loading weights from: {weights_path}")
+    log("INFERENCE", f"Loading weights from: {weights_path}", level="info")
     checkpoint = torch.load(weights_path, map_location=device)
 
     if isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
@@ -226,7 +227,7 @@ def visualize_confidences(predictions, events, cfg, save_path):
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
     plt.close(fig)
-    print(f"[Output] Plot saved to: {save_path}")
+    log("INFERENCE", f"Plot saved to: {save_path}", level="success")
 
 
 def run_nn_inference(
@@ -255,7 +256,7 @@ def run_nn_inference(
         if not os.path.isabs(app_config):
             app_config = os.path.join(PROJECT_ROOT, app_config)
 
-        print(f"[Inference] Loading App Config from: {app_config}")
+        log("INFERENCE", f"Loading App Config from: {app_config}", level="info")
 
         with open(app_config) as f:
             cfg = yaml.safe_load(f)
@@ -292,7 +293,7 @@ def run_nn_inference(
     if 'framerate' in train_cfg.get('data', {}):
         trained_fps = train_cfg['data']['framerate']
         if trained_fps != target_fps:
-            print(f"[Inference] Overriding App FPS ({target_fps}) -> Model Trained FPS ({trained_fps})")
+            log("INFERENCE", f"Overriding App FPS ({target_fps}) -> Model Trained FPS ({trained_fps})", level="warning")
             target_fps = trained_fps
 
     # Sync features
@@ -322,7 +323,7 @@ def run_nn_inference(
     )
 
     if not feature_matrices:
-        print("[Inference] Warning: No valid clips generated (low confidence or short video).")
+        log("INFERENCE", "Warning: No valid clips generated (low confidence or short video).", level="warning")
         return None
 
     # Load Model & Predictor
@@ -366,7 +367,7 @@ def run_nn_inference(
     min_dist_sec = post_proc_cfg.get('min_distance_sec', 0.25)
     min_dist_frames = int(min_dist_sec * target_fps)
 
-    print(f"[Inference] Extracting events (Threshold: {threshold}, Min Dist: {min_dist_frames} frames)...")
+    log("INFERENCE", f"Extracting events (Threshold: {threshold}, Min Dist: {min_dist_frames} frames)...", level="info")
     structured_events = extract_gait_events(
         predictions=full_prediction,
         threshold=threshold,
@@ -414,7 +415,7 @@ if __name__ == "__main__":
         output_dir = f"results/test_patient_{net}"
 
         data = run_nn_inference(config, input_path, output_dir)
-        print(f"Testing {net}...")
+        log("INFERENCE", f"Testing {net}...", level="info")
 
         from utils.gait_structs import build_phases_from_events
         from tools.debug_viz import visualize_gait_phases, print_statistics

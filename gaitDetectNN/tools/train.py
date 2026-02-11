@@ -26,6 +26,7 @@ from loaders import GaitDataset, collate_pad
 from utils.preprocessing import generate_features
 from utils.data import find_matching_annotation
 from skeletons import get_skeleton_by_name
+from utils.logger import log
 
 def set_seed(seed):
     """
@@ -46,7 +47,7 @@ def build_optimizer(model, training_cfg):
     lr = float(training_cfg['learning_rate'])
     weight_decay = float(training_cfg.get('weight_decay', 0.01))  # Default 0.01
 
-    print(f"[Optimizer] Using {opt_type} (lr={lr}, weight_decay={weight_decay})")
+    log("TRAIN", f"Using {opt_type} (lr={lr}, weight_decay={weight_decay})", level="info")
 
     if opt_type == 'AdamW':
         return torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -75,7 +76,7 @@ def build_scheduler(optimizer, training_cfg, steps_per_epoch):
     sched_params = training_cfg.get('scheduler_config', {})
     if sched_params is None: sched_params = {}
 
-    print(f"[Scheduler] Initializing {sched_type} with params: {sched_params}")
+    log("TRAIN", f"Initializing {sched_type} with params: {sched_params}", level="info")
 
     if sched_type == 'OneCycleLR':
         return OneCycleLR(
@@ -90,7 +91,7 @@ def build_scheduler(optimizer, training_cfg, steps_per_epoch):
         return StepLR(optimizer, **sched_params)
 
     else:
-        print(f"Warning: Unknown scheduler type '{sched_type}'. No scheduler used.")
+        log("TRAIN", f"Unknown scheduler type '{sched_type}'. No scheduler used.", level="warning")
         return None
 
 
@@ -110,7 +111,7 @@ def save_history(history, output_dir):
 
     with open(history_path, 'w') as f:
         json.dump(clean_history, f, indent=4)
-    print(f"[Output] History saved to {history_path}")
+    log("TRAIN", f"History saved to {history_path}", level="success")
 
 
 def plot_training_curves(history, output_dir):
@@ -153,7 +154,7 @@ def plot_training_curves(history, output_dir):
 
     plot_path = os.path.join(output_dir, "training_plot.png")
     plt.savefig(plot_path)
-    print(f"[Output] Training plot saved to {plot_path}")
+    log("TRAIN", f"Training plot saved to {plot_path}", level="success")
 
 
 def main():
@@ -177,7 +178,7 @@ def main():
     args = parser.parse_args()
 
     # SETUP OUTPUT DIRECTORY
-    print(f"Loading configuration from: {args.config}")
+    log("TRAIN", f"Loading configuration from: {args.config}", level="info")
     with open(args.config, 'r') as f:
         cfg = yaml.safe_load(f)
 
@@ -194,12 +195,12 @@ def main():
     seed = cfg.get('training', {}).get('seed', 3)
     set_seed(seed)
 
-    print(f"--- Experiment: {experiment_name} ---")
-    print(f"--- Output Dir: {output_dir} ---")
-    print(f"--- Device: {device} | Seed: {seed} ---")
+    log("TRAIN", f"Experiment: {experiment_name}", level="info")
+    log("TRAIN", f"Output Dir: {output_dir}", level="info")
+    log("TRAIN", f"Device: {device} | Seed: {seed}", level="info")
 
     # DATA PREPARATION
-    print("\n[Data] Preparing dataset...")
+    log("TRAIN", "Preparing dataset...", level="info")
     dataset_root = os.path.join(PROJECT_ROOT, cfg['data']['dataset_root'])
     annotation_root = os.path.join(PROJECT_ROOT, cfg['data'].get('annotation_root', 'annotations'))
     framerate = cfg['data']['framerate']
@@ -209,7 +210,7 @@ def main():
     tolerance_frames = int(round((tolerance_ms / 1000.0) * framerate))
 
     search_pattern = os.path.join(dataset_root, str(framerate), "KEYPOINTS", "*.json")
-    print(f"Searching: {search_pattern}")
+    log("TRAIN", f"Searching: {search_pattern}", level="info")
     keypoint_files = glob(search_pattern, recursive=True)
 
     if not keypoint_files:
@@ -222,7 +223,7 @@ def main():
         if ann_path and os.path.exists(ann_path):
             file_paths.append((kp_path, ann_path))
 
-    print(f"Found {len(file_paths)} valid pairs.")
+    log("TRAIN", f"Found {len(file_paths)} valid pairs.", level="success")
 
     # Shuffle & Split
     random.shuffle(file_paths)
@@ -267,7 +268,7 @@ def main():
                             pin_memory=True)
 
     # CLASS WEIGHTS
-    print("\n[Data] Calculating class weights...")
+    log("TRAIN", "Calculating class weights...", level="info")
     positives = 0
     total_samples = 0
     for _, labels in train_dataset.data:
@@ -277,11 +278,11 @@ def main():
     negatives = total_samples - positives
     pos_weight = negatives / positives if positives > 0 else 1.0
     pos_weight_tensor = torch.tensor([pos_weight], device=device)
-    print(f"Pos Weight: {pos_weight:.2f}")
+    log("TRAIN", f"Pos Weight: {pos_weight:.2f}", level="info")
 
     # Adjacency matrix flag
     if cfg['data'].get('requires_adj_matrix', False):
-        print("[Config] 'requires_adj_matrix' is True -> Injecting feature config to model.")
+        log("TRAIN", "'requires_adj_matrix' is True -> Injecting feature config to model.", level="info")
 
         features_cfg = cfg['data']['features']
 
@@ -298,7 +299,7 @@ def main():
 
     # BUILD MODEL
     input_size = train_dataset.data[0][0].shape[1]
-    print(f"\n[Model] Building '{cfg['model']['type']}' (Input: {input_size})")
+    log("TRAIN", f"Building '{cfg['model']['type']}' (Input: {input_size})", level="info")
     model = build_model(cfg['model'], input_size=input_size)
 
     # TRAINING
@@ -322,8 +323,8 @@ def main():
     # SAVE RESULTS
     save_history(history, output_dir)
     plot_training_curves(history, output_dir)
-    print(f"\n[Done] Experiment '{experiment_name}' finished.")
-    print(f"Results saved in: {output_dir}")
+    log("TRAIN", f"Experiment '{experiment_name}' finished.", level="success")
+    log("TRAIN", f"Results saved in: {output_dir}", level="info")
 
 
 if __name__ == "__main__":

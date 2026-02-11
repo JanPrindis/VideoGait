@@ -7,6 +7,7 @@ from ..base import BaseHeuristicDetector
 from utils.gait_structs import GaitEvent, GaitEventType
 from .zeni import Zeni
 from utils.data import butterworth_filter
+from utils.logger import log
 
 
 @HEURISTICS.register
@@ -223,7 +224,7 @@ class Bonci(BaseHeuristicDetector):
             plt.tight_layout()
             plt.savefig(path, dpi=150)
             plt.close()
-            print(f"[Output] Plot saved to: {path}")
+            log("BONCI", f"Plot saved to: {path}", level="success")
             # --- DEBUG PLOT END ---
 
         return refined_left, refined_right

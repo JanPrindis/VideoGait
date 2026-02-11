@@ -3,6 +3,7 @@ import os
 import copy
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import OneCycleLR
+from utils.logger import log
 
 
 class Trainer:
@@ -173,7 +174,7 @@ class Trainer:
         return total_loss / len(self.val_loader), total_f1 / len(self.val_loader)
 
     def fit(self, num_epochs: int, save_path: str | None = None):
-        print("Starting training... Press Ctrl+C to stop early.")
+        log("TRAINER", "Starting training... Press Ctrl+C to stop early.", level="info")
         try:
             for epoch in range(num_epochs):
                 train_loss, train_f1 = self.train_epoch()
@@ -189,10 +190,10 @@ class Trainer:
                 self.history['train_f1'].append(train_f1)
                 self.history['val_f1'].append(val_f1)
 
-                print(f"Epoch {epoch + 1}/{num_epochs} | "
-                      f"LR: {current_lr:.6f} | "
-                      f"Loss: {train_loss:.4f}/{val_loss:.4f} | "
-                      f"F1: {train_f1:.4f}/{val_f1:.4f}", end="")
+                msg = (f"Epoch {epoch + 1}/{num_epochs} | "
+                       f"LR: {current_lr:.6f} | "
+                       f"Loss: {train_loss:.4f}/{val_loss:.4f} | "
+                       f"F1: {train_f1:.4f}/{val_f1:.4f}")
 
                 is_best = False
                 reason = ""
@@ -212,28 +213,28 @@ class Trainer:
                     self.best_val_f1 = val_f1
                     self.best_val_loss = val_loss
                     self.best_model_state = copy.deepcopy(self.model.state_dict())
-                    print(f" -> SAVED! {reason}")
+                    log("TRAINER", f"{msg} -> SAVED! {reason}", level="success")
                 else:
-                    print()
+                    log("TRAINER", msg, level="info")
 
         except KeyboardInterrupt:
-            print("\n\nTraining interrupted by user...")
+            log("TRAINER", "Training interrupted by user...", level="warning")
 
         except Exception as e:
-            print(f"\n\nSomething went wrong during training: {e}")
+            log("TRAINER", f"Something went wrong during training: {e}", level="error")
             pass
 
         finally:
             if self.best_val_f1 == -1.0:
-                print("\nNo best model to save.")
+                log("TRAINER", "No best model to save.", level="warning")
             else:
-                print(f"\nLoading best model (F1: {self.best_val_f1:.4f}, Loss: {self.best_val_loss:.4f})")
+                log("TRAINER", f"Loading best model (F1: {self.best_val_f1:.4f}, Loss: {self.best_val_loss:.4f})", level="info")
                 self.model.load_state_dict(self.best_model_state)
 
                 if save_path:
                     os.makedirs(os.path.dirname(save_path), exist_ok=True)
                     torch.save(self.best_model_state, save_path)
-                    print(f"Best model saved to {save_path}")
+                    log("TRAINER", f"Best model saved to {save_path}", level="success")
 
-            print("Training finished.")
+            log("TRAINER", "Training finished.", level="success")
             return self.history

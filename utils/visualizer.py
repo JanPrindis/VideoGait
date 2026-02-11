@@ -15,6 +15,7 @@ from skeletons.skeletons import SkeletonSide
 from utils.config_utils import resolve_skeleton_from_config
 from utils.gait_structs import PhaseType, GaitEventType
 from utils.json_serializer import KeypointSerializer
+from utils.logger import log
 
 
 class GaitVisualizer:
@@ -109,7 +110,7 @@ class GaitVisualizer:
         raw_data = KeypointSerializer.load(json_path)
 
         if not raw_data:
-            print("[Visualizer] Warning: JSON is empty!")
+            log("VISUALIZER", "Warning: JSON is empty!", level="warning")
             return np.zeros((video_total_frames, 17, 3))  # Fallback shape
 
         # Get number of keypoints
@@ -177,12 +178,11 @@ class GaitVisualizer:
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
         if isinstance(keypoints_data, str):
-            print(f"[Visualizer] Loading keypoints from JSON: {keypoints_data}")
+            log("VISUALIZER", f"Loading keypoints from JSON: {keypoints_data}", level="info")
             keypoints_data = self._load_and_parse_json(keypoints_data, total_frames)
 
         if len(keypoints_data) > total_frames:
-            print(
-                f"[Visualizer] Warning: Keypoints length ({len(keypoints_data)}) > Video frames ({total_frames}). Truncating extra.")
+            log("VISUALIZER", f"Warning: Keypoints length ({len(keypoints_data)}) > Video frames ({total_frames}). Truncating extra.", level="warning")
 
         # Init writers
         writers = {}
@@ -282,7 +282,7 @@ class GaitVisualizer:
         cap.release()
         for w in writers.values():
             w.release()
-        print(f"[Visualizer] Finished. Outputs in: {out_root}")
+        log("VISUALIZER", f"Finished. Outputs in: {out_root}", level="success")
 
     # =========================================================================
     # Drawing and Logic
@@ -508,7 +508,7 @@ class GaitVisualizer:
                     b = int(hex_str[4:6], 16)
                     return b, g, r  # RGB -> BGR
             except ValueError:
-                print(f"[Visualizer] Warning: Invalid HEX color '{color_input}', using white.")
+                log("VISUALIZER", f"Warning: Invalid HEX color '{color_input}', using white.", level="warning")
 
         return 255, 255, 255  # Fallback
 

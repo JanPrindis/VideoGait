@@ -8,6 +8,7 @@ from utils.gait_structs import GaitEventType
 from utils.data import get_valid_range, get_keypoints, cubic_interpolate_nan, butterworth_filter, average_with_nones, \
     calculate_torso_height, calculate_distance, calculate_angle
 from utils.json_serializer import KeypointSerializer, AnnotationSerializer
+from utils.logger import log
 
 
 def split_video(keypoint_json_path, valid_range):
@@ -268,7 +269,7 @@ def create_processed_clips(
     )
 
     if not valid_indices:
-        print(f"No valid frames found in {keypoints_path} with confidence > {confidence_threshold}. Skipping.")
+        log("PREPROCESS", f"No valid frames found in {keypoints_path} with confidence > {confidence_threshold}. Skipping.", level="warning")
         return [], [], [], determined_frame_rate
 
     # If the "HIP" keypoint data is all None, calculate it by averaging
@@ -361,7 +362,7 @@ def create_processed_clips(
         clips = final_clips
         global_valid_range = final_global_ranges
 
-    print(f"{os.path.basename(keypoints_path)} resulted in {len(clips)} clips!")
+    log("PREPROCESS", f"{os.path.basename(keypoints_path)} resulted in {len(clips)} clips!", level="success")
     return clips, all_labels, global_valid_range, determined_frame_rate
 
 

@@ -17,9 +17,11 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import seaborn as sns
 import yaml
+from tqdm import tqdm
 
 from utils.json_serializer import AnnotationSerializer
 from utils.gait_structs import GaitEventType
+from utils.logger import log
 
 from benchmark.utils.data_manager import get_benchmark_files
 from benchmark.engine.matcher import match_events_greedy
@@ -53,7 +55,7 @@ def run_benchmark():
     args = parser.parse_args()
 
     # Load Config
-    print(f"--- Loading Config: {args.config} ---")
+    log("BENCHMARK", f"Loading Config: {args.config}", level="info")
     with open(os.path.join(PROJECT_ROOT, args.config)) as f:
         cfg = yaml.safe_load(f)
 
@@ -79,9 +81,9 @@ def run_benchmark():
     strict_tolerance_ms = cfg['evaluation'].get('strict_tolerance_ms', 50)
     loose_tolerance_ms = cfg['evaluation'].get('loose_tolerance_ms', 150)
 
-    print(f"\n--- Starting Benchmark: {experiment_name} ---")
-    print(f"[Eval] Loose Tolerance (Graphs): {loose_tolerance_ms} ms")
-    print(f"[Eval] Strict Tolerance (Stats): {strict_tolerance_ms} ms")
+    log("BENCHMARK", f"Starting Benchmark: {experiment_name}", level="info")
+    log("BENCHMARK", f"Loose Tolerance (Graphs): {loose_tolerance_ms} ms", level="info")
+    log("BENCHMARK", f"Strict Tolerance (Stats): {strict_tolerance_ms} ms", level="info")
 
     # Evaluation Loop Containers
     raw_matches = []
@@ -95,8 +97,7 @@ def run_benchmark():
 
     debug_active = args.debug
 
-    for i, item in enumerate(test_files):
-        print(f"[{i + 1}/{len(test_files)}] {item['name']}...", end="\r")
+    for i, item in enumerate(tqdm(test_files, desc="Benchmarking")):
 
         # Predict
         pred_result = wrapper.predict(item['kp'])
@@ -153,10 +154,10 @@ def run_benchmark():
                     })
 
         if i == 0 and debug_active:
-            print(f"\n[Info] Debug print disabled for remaining {len(test_files) - 1} files...\n")
+            log("BENCHMARK", f"Debug print disabled for remaining {len(test_files) - 1} files...", level="info")
             debug_active = False
 
-    print("\n\n--- Processing Results & Generating Plots ---")
+    log("BENCHMARK", "Processing Results & Generating Plots", level="info")
     out_dir = os.path.join(PROJECT_ROOT, cfg['output_dir'])
     os.makedirs(out_dir, exist_ok=True)
     set_publication_style()
@@ -164,7 +165,7 @@ def run_benchmark():
     # --- PROCESS DATA ---
     df_raw = pd.DataFrame(raw_matches)  # Toto obsahuje LOOSE matches
     if df_raw.empty:
-        print("No matches found! Check tolerance or data.")
+        log("BENCHMARK", "No matches found! Check tolerance or data.", level="error")
         return
 
     # Save Loose Matches
@@ -185,7 +186,7 @@ def run_benchmark():
     stats_summary.to_csv(os.path.join(out_dir, "stats_summary_loose.csv"))
 
     # --- RELIABILITY REPORT ---
-    print(f"[Metrics] Calculating scores with STRICT tolerance ({strict_tolerance_ms} ms)...")
+    log("BENCHMARK", f"Calculating scores with STRICT tolerance ({strict_tolerance_ms} ms)...", level="info")
 
     # Filter out data not matching strict tolerance
     df_strict_matches = df_raw[df_raw['AbsErrorMs'] <= strict_tolerance_ms]
@@ -226,7 +227,7 @@ def run_benchmark():
     df_rel = pd.DataFrame(rel_rows)
     df_rel.to_csv(os.path.join(out_dir, "reliability_report_strict.csv"), index=False)
 
-    print("Strict Metrics:")
+    log("BENCHMARK", "Strict Metrics:", level="info")
     print(df_rel[['Side', 'Type', 'Precision', 'Recall', 'F1_Score']])
 
     # --- PLOTS ---
@@ -420,9 +421,9 @@ def run_benchmark():
     plt.savefig(os.path.join(out_dir, "error_distribution_hist_ms.png"))
     plt.close()
 
-    print(f"\n[Success] All results saved to: {out_dir}")
-    print(f" - Reliability calculated with STRICT ({strict_tolerance_ms}ms) tolerance.")
-    print(f" - Plots generated with LOOSE ({loose_tolerance_ms}ms) data.")
+    log("BENCHMARK", f"All results saved to: {out_dir}", level="success")
+    log("BENCHMARK", f" - Reliability calculated with STRICT ({strict_tolerance_ms}ms) tolerance.", level="info")
+    log("BENCHMARK", f" - Plots generated with LOOSE ({loose_tolerance_ms}ms) data.", level="info")
 
 
 if __name__ == "__main__":

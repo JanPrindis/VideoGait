@@ -14,6 +14,7 @@ import yaml
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from weasyprint import HTML
+from utils.logger import log
 
 project_root = pathlib.Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
@@ -58,7 +59,7 @@ class ReportGenerator:
                 with open(full_path, 'r', encoding='utf-8') as f:
                     return yaml.safe_load(f)
         except Exception as e:
-            print(f"[Report Warning] Failed to load config at {rel_path}: {e}")
+            log("REPORT", f"Failed to load config at {rel_path}: {e}", level="warning")
         return {}
 
     def _extract_config_metadata(self):
@@ -201,7 +202,9 @@ class ReportGenerator:
                analysis_source: str | dict,
                graphs_dir: str = None,
                video_dir: str = None,
-               filename_base: str = "gait_report"):
+               filename_base: str = "gait_report",
+               output_type: str = "pdf"
+               ):
         """
         Generates and saves the report in the configured format.
 
@@ -210,14 +213,8 @@ class ReportGenerator:
             graphs_dir (str, optional): Directory containing generated plots. Defaults to output_dir.
             video_dir (str, optional): Directory containing processed videos. Defaults to output_dir.
             filename_base (str, optional): Base filename for the report. Defaults to "gait_report".
+            output_type (str, optional): Output format (HTML, PDF, Interactive HTML). Defaults to "pdf".
         """
-
-        # Get export type from app config
-        output_type = self.app_config.get("visualization", {}).get("text_output_type", "pdf").lower()
-
-        if output_type == "console":
-            print("[Report] Skipping file generation (Config: console)")
-            return
 
         # Load Data
         data = {}
@@ -226,7 +223,7 @@ class ReportGenerator:
                 with open(analysis_source, 'r', encoding='utf-8') as f:
                     data = json.load(f)
             else:
-                print(f"[Error] Analysis file not found")
+                log("REPORT", "Analysis file not found", level="error")
                 return
         elif isinstance(analysis_source, dict):
             data = analysis_source
@@ -280,18 +277,18 @@ class ReportGenerator:
         try:
             if output_type == "html":
                 # HTML mode
-                print("[Report] Rendering HTML Dashboard...")
+                log("REPORT", "Rendering HTML Dashboard...", level="info")
                 template = self.env.get_template("report_html.html")
                 html_content = template.render(**context)
 
                 html_path = os.path.join(self.output_dir, f"{filename_base}.html")
                 with open(html_path, "w", encoding="utf-8") as f:
                     f.write(html_content)
-                print(f"[Report] Saved HTML: {html_path}")
+                log("REPORT", f"Saved HTML: {html_path}", level="success")
 
             elif output_type == "pdf":
                 # PDF mode
-                print("[Report] Rendering PDF Report...")
+                log("REPORT", "Rendering PDF Report...", level="info")
                 template = self.env.get_template("report_pdf.html")
                 # Remder html file to string
                 pdf_html_content = template.render(**context)
@@ -300,7 +297,7 @@ class ReportGenerator:
 
                 # Send to WeasyPrint
                 HTML(string=pdf_html_content, base_url=self.output_dir).write_pdf(pdf_path)
-                print(f"[Report] Saved PDF: {pdf_path}")
+                log("REPORT", f"Saved PDF: {pdf_path}", level="success")
 
             elif output_type == "interactive":
 
@@ -311,7 +308,7 @@ class ReportGenerator:
                     if filtered_videos:
                         context['videos'] = filtered_videos[:3]
 
-                print("[Report] Rendering Interactive Dashboard (Plotly)...")
+                log("REPORT", "Rendering Interactive Dashboard (Plotly)...", level="info")
                 template = self.env.get_template("report_html_interactive.html")
                 html_content = template.render(**context)
 
@@ -319,9 +316,9 @@ class ReportGenerator:
                 html_path = os.path.join(self.output_dir, f"{filename_base}_interactive.html")
                 with open(html_path, "w", encoding="utf-8") as f:
                     f.write(html_content)
-                print(f"[Report] Saved Interactive HTML: {html_path}")
+                log("REPORT", f"Saved Interactive HTML: {html_path}", level="success")
 
         except Exception as e:
-            print(f"[Error] Report generation failed: {e}")
+            log("REPORT", f"Report generation failed: {e}", level="error")
             import traceback
             traceback.print_exc()

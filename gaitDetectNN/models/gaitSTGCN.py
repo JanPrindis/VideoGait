@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from utils.registry import MODELS
 from skeletons import get_skeleton_by_name
+from utils.logger import log
 
 
 class GraphConvolution(nn.Module):
@@ -191,7 +192,7 @@ class GaitSTGCN(nn.Module):
             if found: break
 
         if not found:
-            print(f"[ST-GCN Warning] Could not detect center node from names. Using first node: {node_names[0]}")
+            log("ST-GCN", f"Could not detect center node from names. Using first node: {node_names[0]}", level="warning")
 
         # Distance from center node
         dist = self._get_hop_distance(num_nodes, adj_list, center_idx)

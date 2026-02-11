@@ -5,6 +5,7 @@ from utils.registry import HEURISTICS
 from ..base import BaseHeuristicDetector
 from utils.gait_structs import GaitEvent, GaitEventType
 from utils.data import find_minima_maxima, butterworth_filter
+from utils.logger import log
 
 
 @HEURISTICS.register
@@ -181,7 +182,7 @@ class OConnor(BaseHeuristicDetector):
             plt.tight_layout()
             plt.savefig(path, dpi=150)
             plt.close()
-            print(f"[Output] Plot saved to: {path}")
+            log("OCONNOR", f"Plot saved to: {path}", level="success")
         # --- DEBUG PLOT END ---
 
         return left_events, right_events

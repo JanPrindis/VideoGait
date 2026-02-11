@@ -1,6 +1,7 @@
 import os
 import yaml
 from skeletons import get_skeleton_by_name
+from utils.logger import log
 
 def resolve_skeleton_from_config(app_config):
     """
@@ -34,8 +35,8 @@ def resolve_skeleton_from_config(app_config):
                     nn_config = yaml.safe_load(f)
                     skel_name = nn_config.get('data', {}).get('skeleton', 'halpe')
             except Exception as e:
-                print(f"[ConfigUtils] Error loading NN config at {nn_cfg_path}: {e}")
+                log("CONFIG", f"Error loading NN config at {nn_cfg_path}: {e}", level="error")
         else:
-            print(f"[ConfigUtils] Warning: NN config not found at {nn_cfg_path}, using default.")
+            log("CONFIG", f"Warning: NN config not found at {nn_cfg_path}, using default.", level="warning")
 
     return get_skeleton_by_name(skel_name)

@@ -13,6 +13,7 @@ from detectors import POSE_DETECTORS
 from detectors.base import BaseDetector
 from utils.json_serializer import KeypointSerializer
 from .tools import PoseTracker, Custom
+from utils.logger import log
 
 
 @POSE_DETECTORS.register
@@ -43,7 +44,7 @@ class RTMLib(BaseDetector):
         det_input_size = tuple(self.config.get('det_input_size', [640, 640]))
         pose_input_size = tuple(self.config.get('pose_input_size', [288, 384]))
 
-        print(f"[RTMLib] Initializing with models:\n  Det: {det_path}\n  Pose: {pose_path}")
+        log("RTMLib", f"Initializing with models:\n  Det: {det_path}\n  Pose: {pose_path}", level="info")
 
         # Initialize Custom Solution
         self.custom = partial(

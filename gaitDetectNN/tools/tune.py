@@ -23,6 +23,7 @@ from utils.preprocessing import generate_features
 from utils.data import find_matching_annotation
 from skeletons import get_skeleton_by_name
 from train import build_scheduler
+from utils.logger import log
 
 
 # ==============================================================================
@@ -215,7 +216,7 @@ def objective(trial, base_cfg, train_loader, val_loader, input_size, pos_weight,
         return val_f1
 
     except RuntimeError as e:
-        print(f"Trial failed: {e}")
+        log("TUNE", f"Trial failed: {e}", level="error")
         return 0.0
 
 
@@ -235,7 +236,7 @@ def main():
         cfg = yaml.safe_load(f)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"--- Tuning: {cfg['model']['type']} | Device: {device} ---")
+    log("TUNE", f"Tuning: {cfg['model']['type']} | Device: {device}", level="info")
 
     # --------------------------------------------------------------------------
     # DATASET
@@ -282,7 +283,7 @@ def main():
         "distance_pairs": features_cfg.get('distances'),
     }
 
-    print("Loading datasets...")
+    log("TUNE", "Loading datasets...", level="info")
     train_dataset = GaitDataset(train_paths, preprocessing_fn=generate_features, **preprocess_args)
     val_dataset = GaitDataset(val_paths, preprocessing_fn=generate_features, **preprocess_args)
 
@@ -305,7 +306,7 @@ def main():
     negatives = total_samples - positives
     pos_weight_val = negatives / positives if positives > 0 else 1.0
     pos_weight = torch.tensor([pos_weight_val], device=device)
-    print(f"Calculated Pos Weight: {pos_weight_val:.2f}")
+    log("TUNE", f"Calculated Pos Weight: {pos_weight_val:.2f}", level="info")
 
     # Determine input size
     input_size = train_dataset.data[0][0].shape[1]
@@ -313,7 +314,7 @@ def main():
     # --------------------------------------------------------------------------
     # OPTIMIZATION
     # --------------------------------------------------------------------------
-    print(f"\nStarting Optuna Study: {args.study_name} ({args.trials} trials)")
+    log("TUNE", f"Starting Optuna Study: {args.study_name} ({args.trials} trials)", level="info")
 
     study = optuna.create_study(
         direction="maximize",
@@ -329,12 +330,10 @@ def main():
     # --------------------------------------------------------------------------
     # RESULTS
     # --------------------------------------------------------------------------
-    print("\n" + "=" * 50)
-    print(f"TUNING FINISHED. Best F1: {study.best_value:.4f}")
-    print("=" * 50)
-    print("Best Params:")
+    log("TUNE", f"TUNING FINISHED. Best F1: {study.best_value:.4f}", level="success")
+    log("TUNE", "Best Params:", level="info")
     for key, value in study.best_params.items():
-        print(f"  {key}: {value}")
+        log("TUNE", f"  {key}: {value}", level="info")
 
     # Save best parameters into config file
     output_path = os.path.join(os.path.dirname(args.config), "best_params.yaml")
@@ -347,7 +346,7 @@ def main():
     with open(output_path, 'w') as f:
         yaml.dump(best_config_dump, f)
 
-    print(f"\nBest parameters saved to: {output_path}")
+    log("TUNE", f"Best parameters saved to: {output_path}", level="success")
 
 
 if __name__ == "__main__":

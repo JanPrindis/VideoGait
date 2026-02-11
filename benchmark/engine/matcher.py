@@ -1,3 +1,5 @@
+from utils.logger import log
+
 def match_events_greedy(gt_frames, pred_frames, tolerance_frames, verbose=False, label=""):
     """
     Matches predicted events to ground truth events using a greedy strategy.
@@ -27,9 +29,9 @@ def match_events_greedy(gt_frames, pred_frames, tolerance_frames, verbose=False,
     matched_gt_count = 0
 
     if verbose:
-        print(f"\n--- DEBUG MATCHING: {label} (Tol: {tolerance_frames}) ---")
-        print(f"GT List:   {gt_frames}")
-        print(f"Pred List: {pred_frames}")
+        log("MATCH", f"DEBUG MATCHING: {label} (Tol: {tolerance_frames})", level="info")
+        log("MATCH", f"GT List:   {gt_frames}", level="info")
+        log("MATCH", f"Pred List: {pred_frames}", level="info")
 
     for gt in gt_frames:
         candidates = []
@@ -54,10 +56,10 @@ def match_events_greedy(gt_frames, pred_frames, tolerance_frames, verbose=False,
             matched_gt_count += 1
 
             if verbose:
-                print(f"  ✅ MATCH: GT {gt:<5} <--> Pred {best_pred:<5} | Diff: {best_err:+d}")
+                log("MATCH", f"✅ MATCH: GT {gt:<5} <--> Pred {best_pred:<5} | Diff: {best_err:+d}", level="success")
         else:
             if verbose:
-                print(f"  ❌ MISS:  GT {gt:<5} <--> (No candidate in range)")
+                log("MATCH", f"❌ MISS:  GT {gt:<5} <--> (No candidate in range)", level="warning")
 
     misses = len(gt_frames) - matched_gt_count
     extras = len(pred_frames) - len(used_predictions)
@@ -66,7 +68,6 @@ def match_events_greedy(gt_frames, pred_frames, tolerance_frames, verbose=False,
         # Print extra detections that were not matched
         for i, pred in enumerate(pred_frames):
             if i not in used_predictions:
-                print(f"  ⚠️ EXTRA: (No GT)   <--> Pred {pred:<5}")
-        print("-" * 40)
+                log("MATCH", f"EXTRA: (No GT)   <--> Pred {pred:<5}", level="warning")
 
     return errors, misses, extras

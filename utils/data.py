@@ -5,6 +5,7 @@ from scipy.interpolate import CubicSpline
 from scipy.signal import find_peaks, butter, filtfilt
 
 from utils.json_serializer import KeypointSerializer
+from utils.logger import log
 
 
 def create_folder_if_not_exists(folder_path):
@@ -145,7 +146,7 @@ def cubic_interpolate_nan(data):
         return y_interp
 
     except Exception as e:
-        print(f"[Warning] Interpolation failed: {e}")
+        log("DATA", f"Interpolation failed: {e}", level="warning")
         return y
 
 
@@ -161,7 +162,7 @@ def butterworth_filter(data, cutoff=5, fs=60.0, order=5):
     # filtfilt requires 'padlen', which is 3 * (max(len(a), len(b)) - 1).
     if len(y) <= 3 * order:
         # Not enough data
-        print("[Warning] Butterworth filter: Input data sequence to short, returning original!")
+        log("DATA", "Butterworth filter: Input data sequence to short, returning original!", level="warning")
         return y
 
     # Nyquist frequency check
@@ -169,7 +170,7 @@ def butterworth_filter(data, cutoff=5, fs=60.0, order=5):
     if cutoff >= nyquist:
         # Frequency is higher than what we are able to filter - Fallback to .99 * nyquist
         cutoff = 0.99 * nyquist
-        print(f"[Warning] Butterworth filter: Cutoff frequency is too high, using 0.99 * nyquist = {cutoff}!")
+        log("DATA", f"Butterworth filter: Cutoff frequency is too high, using 0.99 * nyquist = {cutoff}!", level="warning")
 
     if cutoff <= 0:
         return y
@@ -181,7 +182,7 @@ def butterworth_filter(data, cutoff=5, fs=60.0, order=5):
         y_filtered = filtfilt(b, a, y)
         return np.array(y_filtered)
     except ValueError as e:
-        print(f"[Error] Butterworth filter: {e}")
+        log("DATA", f"Butterworth filter: {e}", level="error")
         return y
 
 
@@ -388,7 +389,7 @@ def find_matching_annotation(keypoint_json_path: str, annotations_root: str) -> 
 
         # Sanity check if path is as expected
         if parts[-2].upper() != 'KEYPOINTS' or parts[-4].upper() != 'PROCESSED':
-             print(f"[Warning] Keypoint path '{keypoint_json_path}' does not seem to match the expected structure.")
+             log("DATA", f"Keypoint path '{keypoint_json_path}' does not seem to match the expected structure.", level="warning")
              return None
 
         # Construct the new path using the extracted parts
@@ -396,7 +397,7 @@ def find_matching_annotation(keypoint_json_path: str, annotations_root: str) -> 
         return annotation_path
 
     except IndexError:
-        print(f"[Warning] Could not parse keypoint path: '{keypoint_json_path}'.")
+        log("DATA", f"Could not parse keypoint path: '{keypoint_json_path}'.", level="warning")
         return None
 
 

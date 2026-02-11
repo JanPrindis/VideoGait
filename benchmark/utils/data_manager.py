@@ -15,6 +15,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from utils.data import find_matching_annotation
+from utils.logger import log
 
 
 def get_data_settings(cfg):
@@ -55,7 +56,7 @@ def get_data_settings(cfg):
         if not os.path.exists(train_cfg_path):
             raise FileNotFoundError(f"Training config missing for NeuralNet: {train_cfg_path}")
 
-        print(f"[Data] Auto-resolving data settings from experiment: {nn_cfg['experiment_path']}")
+        log("DATA", f"Auto-resolving data settings from experiment: {nn_cfg['experiment_path']}", level="info")
         with open(train_cfg_path) as f:
             train_cfg = yaml.safe_load(f)
 
@@ -66,7 +67,7 @@ def get_data_settings(cfg):
     # For heuristic methods, pull the config from the config file
     elif method == "Heuristic":
         heuristics_cfg = cfg['event_detector']['heuristic']
-        print(f"[Data] Using explicit settings from Heuristic config.")
+        log("DATA", "Using explicit settings from Heuristic config.", level="info")
 
         settings["framerate"] = cfg['preprocessing']['framerate']
         settings["seed"] = heuristics_cfg['seed']
@@ -99,7 +100,7 @@ def get_benchmark_files(cfg):
     fps = settings["framerate"]
     search_pattern = os.path.join(settings["dataset_root"], str(fps), "KEYPOINTS", "*.json")
 
-    print(f"[Data] Searching: {search_pattern}")
+    log("DATA", f"Searching: {search_pattern}", level="info")
     files = glob(search_pattern, recursive=True)
 
     # Find matching annotations
@@ -109,11 +110,11 @@ def get_benchmark_files(cfg):
         if ann and os.path.exists(ann):
             paired_files.append({"kp": kp, "ann": ann, "name": os.path.basename(kp)})
 
-    print(f"[Data] Found {len(paired_files)} valid pairs.")
+    log("DATA", f"Found {len(paired_files)} valid pairs.", level="success")
 
     # If using the full dataset, return
     if settings["use_full"]:
-        print("[Data] Using FULL dataset.")
+        log("DATA", "Using FULL dataset.", level="warning")
         return paired_files, settings["framerate"]
 
     # Otherwise replicate the training/validation split
@@ -130,11 +131,11 @@ def get_benchmark_files(cfg):
 
 
     for file in test_files:
-        print(f"[DATA] Filtered file: {file['name']}")
+        log("DATA", f"Filtered file: {file['name']}", level="info")
 
 
-    print(f"[Data] Using VALIDATION split (Seed: {seed}, Ratio: {ratio})")
-    print(f"       -> Train set (ignored): {split_idx}")
-    print(f"       -> Test set (used):     {len(test_files)}")
+    log("DATA", f"Using VALIDATION split (Seed: {seed}, Ratio: {ratio})", level="info")
+    log("DATA", f"       -> Train set (ignored): {split_idx}", level="info")
+    log("DATA", f"       -> Test set (used):     {len(test_files)}", level="info")
 
     return test_files, settings["framerate"]

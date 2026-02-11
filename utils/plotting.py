@@ -13,6 +13,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from utils.logger import log
 
 # Styling
 plt.style.use('seaborn-v0_8-whitegrid')
@@ -97,7 +98,7 @@ class GaitPlotter:
         elif isinstance(analysis_source, dict):
             data = analysis_source
 
-        print(f"[Plotter] Generating charts for {source_name}...")
+        log("PLOTTER", f"Generating charts for {source_name}...", level="info")
 
         valid_ranges = data.get("metadata", {}).get("valid_ranges", [])
 

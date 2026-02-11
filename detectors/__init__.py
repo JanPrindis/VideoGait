@@ -12,6 +12,7 @@ via the builder without manual import statements.
 import os
 import importlib
 from utils.registry import POSE_DETECTORS
+from utils.logger import log
 
 detectors_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -26,7 +27,7 @@ for item in os.listdir(detectors_dir):
                 importlib.import_module(f".{item}.wrapper", package=__name__)
 
             except Exception as e:
-                print(f"Failed to load detector wrapper '{item}': {e}")
+                log("REGISTRY", f"Failed to load detector wrapper '{item}': {e}", level="error")
                 import traceback
 
                 traceback.print_exc()
@@ -36,4 +37,4 @@ for item in os.listdir(detectors_dir):
             try:
                 importlib.import_module(f".{item}", package=__name__)
             except Exception as e:
-                print(f"Failed to load detector package '{item}': {e}")
+                log("REGISTRY", f"Failed to load detector package '{item}': {e}", level="error")

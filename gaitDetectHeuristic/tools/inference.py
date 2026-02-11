@@ -11,6 +11,7 @@ if PROJECT_ROOT not in sys.path:
 
 # --- IMPORTS ---
 from gaitDetectHeuristic.builder import build_heuristic_detector
+from utils.logger import log
 
 
 def run_heuristic_inference(
@@ -38,7 +39,7 @@ def run_heuristic_inference(
         if not os.path.isabs(app_config):
             app_config = os.path.join(PROJECT_ROOT, app_config)
 
-        print(f"[Inference] Loading App Config from: {app_config}")
+        log("INFERENCE", f"Loading App Config from: {app_config}", level="info")
         with open(app_config, 'r') as f:
             cfg = yaml.safe_load(f)
     else:
@@ -53,19 +54,19 @@ def run_heuristic_inference(
     # Safety Check
     method = cfg.get('event_detector', {}).get('method')
     if method != 'Heuristic':
-        print(f"[Warning] Config specifies method '{method}', but this is the Heuristic pipeline. Proceeding anyway.")
+        log("INFERENCE", f"Config specifies method '{method}', but this is the Heuristic pipeline. Proceeding anyway.", level="warning")
 
     # Build Detector using the Builder Pattern
     try:
         detector = build_heuristic_detector(cfg)
-        print(f"[Inference] Initialized Heuristic Detector: {detector.__class__.__name__}")
+        log("INFERENCE", f"Initialized Heuristic Detector: {detector.__class__.__name__}", level="info")
     except Exception as e:
-        print(f"[Error] Failed to initialize detector: {e}")
+        log("INFERENCE", f"Failed to initialize detector: {e}", level="error")
         return None
 
     # Run Inference
     # The detector handles data loading, preprocessing, and range looping internally
-    print(f"[Inference] Processing {os.path.basename(input_path)}...")
+    log("INFERENCE", f"Processing {os.path.basename(input_path)}...", level="info")
     result = detector.run_inference(input_path, output_dir)
 
     events = result['events']
@@ -74,8 +75,8 @@ def run_heuristic_inference(
 
     l_count = len(events['left'])
     r_count = len(events['right'])
-    print(f"[Results] FPS: {fps} | Walking Segments: {len(ranges)}")
-    print(f"          Left Events: {l_count}, Right Events: {r_count}")
+    log("INFERENCE", f"FPS: {fps} | Walking Segments: {len(ranges)}", level="info")
+    log("INFERENCE", f"Left Events: {l_count}, Right Events: {r_count}", level="info")
 
     # Return structured dictionary matching NN pipeline format
     return {
@@ -99,7 +100,7 @@ if __name__ == "__main__":
         output_dir = f"results/test_patient_{method}"
 
         data = run_heuristic_inference(config, input_path, output_dir)
-        print(f"Testing done: {method}")
+        log("INFERENCE", f"Testing done: {method}", level="success")
 
         if visualize:
             from utils.gait_structs import build_phases_from_events
@@ -112,4 +113,3 @@ if __name__ == "__main__":
 
             print_statistics(l_phases, r_phases, support_phases)
             visualize_gait_phases(l_phases, r_phases, support_phases)
-
