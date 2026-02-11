@@ -994,16 +994,46 @@
             const master = videos[0];
 
             videos.forEach(v => {
+                // On screen video control callbacks
+                v.addEventListener('dblclick', (e) => toggleFullscreen(e.target));
+
+                // Seek
+                v.addEventListener('seeked', () => {
+                    if (document.fullscreenElement === v) {
+                        seek(v.currentTime * FPS);
+                    }
+                });
+
+                // Play
+                v.addEventListener('play', () => {
+                    if (document.fullscreenElement === v && !isPlaying) {
+                        togglePlay();
+                    }
+                });
+
+                // Pause
+                v.addEventListener('pause', () => {
+                    if (document.fullscreenElement === v && isPlaying) {
+                        togglePlay();
+                    }
+                });
+            });
+
+            videos.forEach(v => {
                 v.addEventListener('dblclick', (e) => toggleFullscreen(e.target));
             });
 
             master.addEventListener('seeked', () => {
-               videos.forEach(v => { if(v !== master) v.currentTime = master.currentTime; });
-               updateUI(master.currentTime * FPS, true);
+                // Update UI if not in fullscreen
+                if (!document.fullscreenElement || document.fullscreenElement === master) {
+                    videos.forEach(v => { if(v !== master) v.currentTime = master.currentTime; });
+                    updateUI(master.currentTime * FPS, true);
+                }
             });
 
             master.addEventListener('ended', () => {
-                isPlaying = false; document.getElementById('play-icon').innerText = '▶';
+                isPlaying = false;
+                document.getElementById('play-icon').innerText = '▶';
             });
         }
 
@@ -1048,12 +1078,33 @@
     }
 
     function handleFullscreenChange() {
-        // Find fullscreen element
         const fullscreenElement = document.fullscreenElement;
 
+        // Sync on fullscreen exit
+        if (!fullscreenElement) {
+            // Find active video
+            const prevActiveVideo = videos.find(v => v.controls);
+
+            if (prevActiveVideo) {
+                // Sync global time
+                seek(prevActiveVideo.currentTime * FPS);
+
+                // If video still playing, play others
+                if (!prevActiveVideo.paused && !isPlaying) {
+                    togglePlay();
+                } else if (prevActiveVideo.paused && isPlaying) {
+                    togglePlay();
+                }
+            }
+        }
+        // -------------------------------------------
+
         videos.forEach(v => {
-            // If current element is in fullscreen - show normal controls
-            v.controls = v === fullscreenElement;
+            if (v === fullscreenElement) {
+                v.controls = true;
+            } else {
+                v.controls = false;
+            }
         });
     }
 
