@@ -115,6 +115,9 @@ class BaseFileSystemPicker(ModalScreen[Path]):
     # --- DIRECTORY TREE CALLBACKS ---
     def on_directory_tree_directory_selected(self, event: DirectoryTree.DirectorySelected):
         event.stop()  # Prevent default behaviour
+        if event.path == self.current_path:
+            return
+
         self.navigate_to(event.path)
 
     def action_go_up(self):
