@@ -201,8 +201,11 @@ def run_analysis_pipeline(
         return None
 
     # --- GENERATE PLOTS ---
-    plotter = GaitPlotter(str(output_dir / "plots"))
-    plotter.generate_plots_from_json(analysis_source=analysis_report)
+    if output_format == "interactive":
+        log("PIPELINE", "Interactive HTML selected, skipping plots generation.", level="warning")
+    else:
+        plotter = GaitPlotter(str(output_dir / "plots"))
+        plotter.generate_plots_from_json(analysis_source=analysis_report)
 
     # --- EXPORT ---
     # TODO: Annoying setup - document: https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation
