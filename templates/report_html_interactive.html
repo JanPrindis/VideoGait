@@ -542,67 +542,104 @@
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-100">
-                <h4>Phase History</h4>
-                <table>
-                    <thead>
-                    <tr>
-                        <th class="text-left">Phase</th>
-                        <th>Frames</th>
-                        <th>Duration (s)</th>
-                        <th>Mean</th>
-                        <th>Range</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% set l_groups = d.detailed_statistics.left.get(joint, {}).get('grouped_phases', []) %}
-                    {% set r_groups = d.detailed_statistics.right.get(joint, {}).get('grouped_phases', []) %}
+       <div style="margin-top: 20px;">
+            <h4 style="margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 5px;">Phase History by Clip</h4>
 
-                    {% for i in range(l_groups|length) %}
-                    {% set group = l_groups[i] %}
-                    <tr>
-                        <td colspan="5" class="group-header" style="background:#e3f2fd; color:#2c3e50;">LEFT - {{
-                            group.name }}
-                        </td>
-                    </tr>
-                    {% for p in group.phases %}
-                    <tr>
-                        <td>{{ p.type }}</td>
-                        <td style="font-family: monospace;">
-                            <a onclick="seek({{ p.frames[0] }})" style="cursor:pointer; color:var(--accent);">▶ {{
-                                p.frames[0] }}-{{ p.frames[1] }}</a>
-                        </td>
-                        <td>{{ p.duration|fmt(2) }}</td>
-                        <td>{{ p.mean|fmt(1) }}</td>
-                        <td>{{ p.range|fmt(1) }}</td>
-                    </tr>
-                    {% endfor %}
+            {% set l_groups = d.detailed_statistics.left.get(joint, {}).get('grouped_phases', []) %}
+            {% set r_groups = d.detailed_statistics.right.get(joint, {}).get('grouped_phases', []) %}
 
-                    {% if i < r_groups|length %}
-                    {% set group = r_groups[i] %}
-                    <tr>
-                        <td colspan="5" class="group-header" style="background:#ffebee; color:#c0392b;">RIGHT - {{
-                            group.name }}
-                        </td>
-                    </tr>
-                    {% for p in group.phases %}
-                    <tr>
-                        <td>{{ p.type }}</td>
-                        <td style="font-family: monospace;">
-                            <a onclick="seek({{ p.frames[0] }})" style="cursor:pointer; color:var(--accent);">▶ {{
-                                p.frames[0] }}-{{ p.frames[1] }}</a>
-                        </td>
-                        <td>{{ p.duration|fmt(2) }}</td>
-                        <td>{{ p.mean|fmt(1) }}</td>
-                        <td>{{ p.range|fmt(1) }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% endif %}
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            {# Zjistíme maximální počet klipů, abychom mohli iterovat #}
+            {% set max_clips = [l_groups|length, r_groups|length] | max %}
+
+            {% if max_clips == 0 %}
+                <div style="text-align: center; color: #999; padding: 20px;">No phase data available.</div>
+            {% else %}
+
+                {% for i in range(max_clips) %}
+                <div class="row" style="margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 10px;">
+
+                    <div class="col-50">
+                        {% if i < l_groups|length %}
+                            {% set group = l_groups[i] %}
+                            <div style="font-weight: bold; color: #2c3e50; margin-bottom: 5px; background: #e3f2fd; padding: 5px 10px; border-radius: 4px;">
+                                LEFT - {{ group.name }}
+                            </div>
+                            <table style="margin-bottom: 0;">
+                                <thead>
+                                    <tr>
+                                        <th class="text-left">Phase</th>
+                                        <th>Frames</th>
+                                        <th>Duration (s)</th>
+                                        <th>Mean</th>
+                                        <th>Range</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for p in group.phases %}
+                                    <tr>
+                                        <td>{{ p.type }}</td>
+                                        <td style="font-family: monospace;">
+                                            <a onclick="seek({{ p.frames[0] }})" style="cursor:pointer; color:var(--accent); font-weight:bold;">
+                                                ▶ {{ p.frames[0] }}-{{ p.frames[1] }}
+                                            </a>
+                                        </td>
+                                        <td>{{ p.duration|fmt(2) }}</td>
+                                        <td>{{ p.mean|fmt(1) }}</td>
+                                        <td>{{ p.range|fmt(1) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div style="padding: 20px; text-align: center; color: #ccc; border: 1px dashed #ddd; border-radius: 4px;">
+                                No Left Leg data for Clip {{ i + 1 }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-50">
+                        {% if i < r_groups|length %}
+                            {% set group = r_groups[i] %}
+                            <div style="font-weight: bold; color: #c0392b; margin-bottom: 5px; background: #ffebee; padding: 5px 10px; border-radius: 4px;">
+                                RIGHT - {{ group.name }}
+                            </div>
+                            <table style="margin-bottom: 0;">
+                                <thead>
+                                    <tr>
+                                        <th class="text-left">Phase</th>
+                                        <th>Frames</th>
+                                        <th>Duration (s)</th>
+                                        <th>Mean</th>
+                                        <th>Range</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for p in group.phases %}
+                                    <tr>
+                                        <td>{{ p.type }}</td>
+                                        <td style="font-family: monospace;">
+                                            <a onclick="seek({{ p.frames[0] }})" style="cursor:pointer; color:var(--accent); font-weight:bold;">
+                                                ▶ {{ p.frames[0] }}-{{ p.frames[1] }}
+                                            </a>
+                                        </td>
+                                        <td>{{ p.duration|fmt(2) }}</td>
+                                        <td>{{ p.mean|fmt(1) }}</td>
+                                        <td>{{ p.range|fmt(1) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div style="padding: 20px; text-align: center; color: #ccc; border: 1px dashed #ddd; border-radius: 4px;">
+                                No Right Leg data for Clip {{ i + 1 }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                </div>
+                {% endfor %}
+
+            {% endif %}
         </div>
     </div>
     {% endfor %}

@@ -507,78 +507,96 @@
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-50">
-                <h4 style="color: #2980b9;">Left Leg - Phase History</h4>
-                {% set grouped_l = d.detailed_statistics.get('left', {}).get(joint, {}).get('grouped_phases', []) %}
-                {% if grouped_l %}
-                <table>
-                    <thead>
-                    <tr>
-                        <th>Phase</th>
-                        <th>Frames</th>
-                        <th>Duration (s)</th>
-                        <th>Mean</th>
-                        <th>Range</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for group in grouped_l %}
-                    <tr>
-                        <td colspan="5" class="group-header">{{ group.name }}</td>
-                    </tr>
-                    {% for p in group.phases %}
-                    <tr>
-                        <td>{{ p.type }} {{ p.id }}</td>
-                        <td style="font-family: monospace; color: #777;">{{ p.frames[0] }}-{{ p.frames[1] }}</td>
-                        <td>{{ p.duration|fmt(2) }}</td>
-                        <td>{{ p.mean|fmt(1) }}</td>
-                        <td>{{ p.range|fmt(1) }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <p style="text-align: center; color: #999;">No phase data available.</p>
-                {% endif %}
-            </div>
+        <div style="margin-top: 25px;">
+            <h4 style="border-bottom: 2px solid #eee; padding-bottom: 5px; margin-bottom: 15px;">Phase History by Clip</h4>
 
-            <div class="col-50">
-                <h4 style="color: #c0392b;">Right Leg - Phase History</h4>
-                {% set grouped_r = d.detailed_statistics.get('right', {}).get(joint, {}).get('grouped_phases', []) %}
-                {% if grouped_r %}
-                <table>
-                    <thead>
-                    <tr>
-                        <th>Phase</th>
-                        <th>Frames</th>
-                        <th>Dur (s)</th>
-                        <th>Mean</th>
-                        <th>Range</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for group in grouped_r %}
-                    <tr>
-                        <td colspan="5" class="group-header">{{ group.name }}</td>
-                    </tr>
-                    {% for p in group.phases %}
-                    <tr>
-                        <td>{{ p.type }} {{ p.id }}</td>
-                        <td style="font-family: monospace; color: #777;">{{ p.frames[0] }}-{{ p.frames[1] }}</td>
-                        <td>{{ p.duration|fmt(2) }}</td>
-                        <td>{{ p.mean|fmt(1) }}</td>
-                        <td>{{ p.range|fmt(1) }}</td>
-                    </tr>
-                    {% endfor %}
-                    {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
+            {% set l_groups = d.detailed_statistics.left.get(joint, {}).get('grouped_phases', []) %}
+            {% set r_groups = d.detailed_statistics.right.get(joint, {}).get('grouped_phases', []) %}
+
+            {# Zjistíme maximální počet klipů #}
+            {% set max_clips = [l_groups|length, r_groups|length] | max %}
+
+            {% if max_clips == 0 %}
                 <p style="text-align: center; color: #999;">No phase data available.</p>
-                {% endif %}
-            </div>
+            {% else %}
+
+                {% for i in range(max_clips) %}
+                <div class="row" style="margin-bottom: 15px; border-bottom: 1px dashed #eee; padding-bottom: 10px;">
+
+                    <div class="col-50">
+                        {% if i < l_groups|length %}
+                            {% set group = l_groups[i] %}
+                            <div style="font-weight: bold; color: #154360; background: #d6eaf8; padding: 5px 8px; border-radius: 3px; margin-bottom: 5px; font-size: 0.85rem; border-left: 4px solid #3498db;">
+                                LEFT - {{ group.name }}
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th class="text-left">Phase</th>
+                                        <th>Frames</th>
+                                        <th>Duration (s)</th>
+                                        <th>Mean</th>
+                                        <th>Range</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for p in group.phases %}
+                                    <tr>
+                                        <td class="text-left">{{ p.type }}</td>
+                                        <td style="font-family: monospace; color: #666;">{{ p.frames[0] }}-{{ p.frames[1] }}</td>
+                                        <td>{{ p.duration|fmt(2) }}</td>
+                                        <td>{{ p.mean|fmt(1) }}</td>
+                                        <td>{{ p.range|fmt(1) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div style="padding: 15px; text-align: center; color: #bbb; border: 1px dashed #ddd; border-radius: 4px; font-size: 0.9rem;">
+                                No Left Leg data for Clip {{ i + 1 }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-50">
+                        {% if i < r_groups|length %}
+                            {% set group = r_groups[i] %}
+                            <div style="font-weight: bold; color: #78281f; background: #fadbd8; padding: 5px 8px; border-radius: 3px; margin-bottom: 5px; font-size: 0.85rem; border-left: 4px solid #c0392b;">
+                                RIGHT - {{ group.name }}
+                            </div>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th class="text-left">Phase</th>
+                                        <th>Frames</th>
+                                        <th>Duration (s)</th>
+                                        <th>Mean</th>
+                                        <th>Range</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for p in group.phases %}
+                                    <tr>
+                                        <td class="text-left">{{ p.type }}</td>
+                                        <td style="font-family: monospace; color: #666;">{{ p.frames[0] }}-{{ p.frames[1] }}</td>
+                                        <td>{{ p.duration|fmt(2) }}</td>
+                                        <td>{{ p.mean|fmt(1) }}</td>
+                                        <td>{{ p.range|fmt(1) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <div style="padding: 15px; text-align: center; color: #bbb; border: 1px dashed #ddd; border-radius: 4px; font-size: 0.9rem;">
+                                No Right Leg data for Clip {{ i + 1 }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                </div>
+                {% endfor %}
+
+            {% endif %}
         </div>
 
         <div class="row">
