@@ -131,6 +131,8 @@ DirectoryTree, FilteredDirectoryTree {
     width: 100%;
 }
 
+#btn_open_report { display: none; }
+
 /* --- OUTPUT AREA & TQDM BAR --- */
 #output-area {
     height: 100%;

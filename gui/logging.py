@@ -78,7 +78,6 @@ class SmartLogger:
             parts = message.split("\r")
             current_status = parts[-1].strip()
             if current_status:
-                # from gui.logging import SmartLogger as SL  # pro přístup k _adapt_tqdm_line
                 adapted = self._adapt_tqdm_line(current_status)
                 self.app.call_from_thread(self.status_widget.update, adapted)
             return

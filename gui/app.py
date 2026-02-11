@@ -4,7 +4,10 @@ This module defines the main Textual application for the Gait Analysis Dashboard
 It provides a Terminal User Interface (TUI) to configure and run the analysis pipeline,
 view execution logs in real-time, and manage input/output paths.
 """
+import os
+import subprocess
 import sys
+import platform
 from pathlib import Path
 
 import logging
@@ -18,6 +21,16 @@ from textual import work
 from main import run_analysis_pipeline
 from gui.logging import SmartLogger
 from gui.screens import FilePicker, DirPicker
+from utils.logger import log
+
+
+def open_file(path: str):
+    if platform.system() == "Windows":
+        os.startfile(path)
+    elif platform.system() == "Darwin":  # macOS
+        subprocess.run(["open", path])
+    else:  # Linux
+        subprocess.run(["xdg-open", path])
 
 
 class VideoGaitTUI(App):
@@ -30,6 +43,7 @@ class VideoGaitTUI(App):
     """
     CSS_PATH = "styles.tcss"
     TITLE = "VideoGait Dashboard"
+    last_report_path = None
 
     def compose(self) -> ComposeResult:
         """Constructs the UI layout."""
@@ -73,6 +87,7 @@ class VideoGaitTUI(App):
             yield Label("Waiting...", id="step_label")
 
             yield Button("START ANALYSIS", variant="success", id="btn_run")
+            yield Button("OPEN REPORT", variant="primary", id="btn_open_report")
 
         # --- OUTPUT AREA ---
         with Vertical(id="output-area"):
@@ -109,6 +124,12 @@ class VideoGaitTUI(App):
 
         elif bid == "btn_run":
             self.run_process()
+
+        if bid == "btn_open_report":
+            if self.last_report_path and os.path.exists(self.last_report_path):
+                open_file(self.last_report_path)
+            else:
+                self.notify("Report file not found!", severity="error")
 
     # --- CALLBACKS ---
     def update_input_end_focused(self, input_id: str, value: str):
@@ -157,7 +178,8 @@ class VideoGaitTUI(App):
         log_widget = self.query_one("#console_log", RichLog)
         status_widget = self.query_one("#status_line", Label)
         step_lbl = self.query_one("#step_label", Label)
-        btn = self.query_one("#btn_run", Button)
+        btn_run = self.query_one("#btn_run", Button)
+        btn_open = self.query_one("#btn_open_report", Button)
 
         self.call_from_thread(status_widget.update, "Running")
 
@@ -201,8 +223,8 @@ class VideoGaitTUI(App):
             return
 
         # --- UI LOCK ---
-        self.call_from_thread(setattr, btn, "label", "Running...")
-        self.call_from_thread(setattr, btn, "disabled", True)
+        self.call_from_thread(setattr, btn_run, "label", "Running...")
+        self.call_from_thread(setattr, btn_run, "disabled", True)
         self.call_from_thread(step_lbl.update, "Initializing...")
 
         # --- SETUP LOGGING ---
@@ -215,6 +237,12 @@ class VideoGaitTUI(App):
             sys.stdout = logger_out
             sys.stderr = logger_err
 
+            # Hide results button while starting a new analysis
+            self.call_from_thread(setattr, btn_open, "display", "none")
+
+            # Clear the output logs before starting a new analysis
+            self.call_from_thread(log_widget.clear)
+
             self.call_from_thread(log_widget.write, f"[bold green]--- STARTING ANALYSIS ---[/]")
             self.call_from_thread(log_widget.write, f"Video: {Path(video_path_str).name}")
 
@@ -226,6 +254,28 @@ class VideoGaitTUI(App):
                 output_root_override=out_override_str,
                 output_format=output_format
             )
+
+            # Show report button
+            if output_format == "pdf":
+                ext = "pdf"
+            elif output_format == "html" or output_format == "interactive":
+                ext = "html"
+            else:
+                ext = None # Fallback
+
+            suffix = "_interactive" if output_format == "interactive" else ""
+
+            # Only show result button when we know the file type
+            if ext:
+                report_file = Path(result_path) / f"{name}_report{suffix}.{ext}"
+
+                if report_file.exists():
+                    self.last_report_path = str(report_file)
+                    self.call_from_thread(setattr, btn_open, "display", "block")
+                else:
+                    log("GUI", f"Report generated, but could not locate file: {report_file.name}", level="warning")  #
+            else:
+                log("GUI", f"Preview not supported for '{output_format}'. Visit the results folder to view the output.", level="warning")
 
             self.call_from_thread(log_widget.write, f"[bold green]Done! Result saved to: {result_path}[/]")
             self.call_from_thread(step_lbl.update, "COMPLETED")
@@ -240,6 +290,6 @@ class VideoGaitTUI(App):
         finally:
             sys.stdout = original_stdout
             sys.stderr = original_stderr
-            self.call_from_thread(setattr, btn, "label", "START ANALYSIS")
-            self.call_from_thread(setattr, btn, "disabled", False)
+            self.call_from_thread(setattr, btn_run, "label", "START ANALYSIS")
+            self.call_from_thread(setattr, btn_run, "disabled", False)
             self.call_from_thread(status_widget.update, "Ready")
