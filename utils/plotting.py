@@ -87,18 +87,15 @@ class GaitPlotter:
             analysis_source (str | dict): Path to the analysis results JSON file or the data dictionary itself.
         """
         data = {}
-        source_name = "Data Dictionary"
-
         if isinstance(analysis_source, str):
             if not os.path.exists(analysis_source):
                 return
             with open(analysis_source, 'r') as f:
                 data = json.load(f)
-            source_name = os.path.basename(analysis_source)
         elif isinstance(analysis_source, dict):
             data = analysis_source
 
-        log("PLOTTER", f"Generating charts for {source_name}...", level="info")
+        log("PLOTTER", f"Generating charts...", level="info")
 
         valid_ranges = data.get("metadata", {}).get("valid_ranges", [])
 

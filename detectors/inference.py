@@ -101,7 +101,7 @@ def run_pose_extraction(app_config: dict, video_path: str, output_root: str = No
         raise FileNotFoundError(f"Detector config not found: {det_config_path}")
 
     # Build & Run
-    log("DETECTOR", f"Building detector from: {det_config_path.name}", level="info")
+    log("BUILDER", f"Building detector from: {det_config_path.name}", level="info")
     detector = build_detector_from_file(str(det_config_path))
 
     log("DETECTOR", f"Processing: {vid_path.name}", level="info")
