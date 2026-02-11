@@ -210,6 +210,9 @@ class DirPicker(BaseFileSystemPicker):
     """
     Modal screen for selecting a directory.
     """
+    def __init__(self, start_path=None):
+        super().__init__(start_path)
+
     def compose(self):
         with Container(classes="modal-container"):
             yield Label("Select Output Directory", classes="modal-header")
@@ -230,7 +233,6 @@ class DirPicker(BaseFileSystemPicker):
 
     def on_button_pressed(self, event: Button.Pressed):
         # Override for select button
-        super().on_button_pressed(event)
         if event.button.id == "select":
             # Return currently opened folder
             self.dismiss(self.current_path)
@@ -253,10 +255,16 @@ class NewFolderModal(ModalScreen[str]):
                 yield Button("Create", variant="success", id="create")
                 yield Button("Cancel", variant="error", id="cancel")
 
+    def on_input_submitted(self, event: Input.Submitted):
+        if event.value.strip():
+            self.dismiss(event.value.strip())
+
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "create":
-            val = self.query_one("#folder_name", Input).value
-            self.dismiss(val)
-
-        else:
+            name = self.query_one("#folder_name", Input).value.strip()
+            if name:
+                self.dismiss(name)
+            else:
+                self.notify("Folder name cannot be empty", severity="warning")
+        elif event.button.id == "cancel":
             self.dismiss(None)
