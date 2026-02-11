@@ -54,17 +54,17 @@ class VideoGaitTUI(App):
             # Video
             yield Label("Input Video:")
             yield Input(placeholder="Select video...", id="input_video")
-            yield Button("Browse Video...", id="btn_browse_video")
+            yield Button("Select Video...", id="btn_browse_video")
 
             # Config
             yield Label("Config File:")
             yield Input(placeholder="Select app config file...", id="input_config")
-            yield Button("Browse Config...", id="btn_browse_config")
+            yield Button("Select Config...", id="btn_browse_config")
 
             # Output override
             yield Label("Output Dir (Optional):")
             yield Input(placeholder="Default: ./results", id="input_output")
-            yield Button("Browse Output...", id="btn_browse_output")
+            yield Button("Select Output Folder...", id="btn_browse_output")
 
             # Name override
             yield Label("Analysis Name:")
