@@ -7,6 +7,9 @@ view execution logs in real-time, and manage input/output paths.
 import sys
 from pathlib import Path
 
+import logging
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Header, Footer, Button, Input, Label, RichLog, Select
