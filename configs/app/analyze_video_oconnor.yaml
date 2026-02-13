@@ -37,7 +37,6 @@ event_detector:
   # Heuristic configuration
   heuristic:
     method: "OConnor"
-    skeleton: "HALPE"
 
     # Method specific parameters
     params:

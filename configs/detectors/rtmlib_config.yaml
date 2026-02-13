@@ -1,4 +1,5 @@
 type: "RTMLib"
+skeleton: "HALPE"
 
 params:
   # Paths to ONNX models (detectors/rtmlib/models)

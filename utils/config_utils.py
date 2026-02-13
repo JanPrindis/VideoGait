@@ -1,42 +1,64 @@
+"""
+This module provides utility functions for handling and resolving configuration parameters.
+
+It specifically handles the logic for determining which skeleton definition to use
+based on the selected event detection method (Heuristic vs NeuralNet) or pose detector configuration.
+"""
 import os
 import yaml
 from skeletons import get_skeleton_by_name
-from utils.logger import log
 
-def resolve_skeleton_from_config(app_config):
+def resolve_skeleton_name_from_config(config: dict) -> str:
     """
-    Determines the correct skeleton definition to use based on the application configuration.
+    Extracts the name of the skeleton (e.g., 'HALPE', 'COCO') from the configuration.
 
-    If the method is 'Heuristic', the skeleton is defined directly in the app config.
-    If the method is 'NeuralNet', the skeleton is defined in the training config of the selected model.
+    It searches in the following order:
+    1. Pose Detector config (if linked in app config).
+    2. Heuristic event detector config.
+    3. Neural Network training data config.
 
     Args:
-        app_config (dict): The loaded application configuration dictionary.
+        config (dict): The configuration dictionary.
 
     Returns:
-        SkeletonDefinition: The resolved skeleton definition object.
+        str: The uppercase name of the skeleton.
+
+    Raises:
+        ValueError: If the skeleton name cannot be found in any expected location.
     """
-    detector_cfg = app_config.get('event_detector', {})
-    method = detector_cfg.get('method', 'Heuristic')
-    skel_name = "halpe"  # Fallback default
+    skeleton_name = None
 
-    if method == 'Heuristic':
-        # event_detector -> heuristic -> skeleton
-        skel_name = detector_cfg.get('heuristic', {}).get('skeleton', 'halpe')
+    # App config - try to find pose detector config
+    pose_cfg_path = config.get('pose_detector', {}).get('config_path')
+    if pose_cfg_path and os.path.exists(pose_cfg_path):
+        with open(pose_cfg_path, 'r') as f:
+            pose_cfg = yaml.safe_load(f)
+            skeleton_name = pose_cfg.get('skeleton')
 
-    elif method == 'NeuralNet':
-        # event_detector -> neural_net -> experiment_path -> (load yaml) -> data -> skeleton
-        exp_path = detector_cfg.get('neural_net', {}).get('experiment_path', '')
-        nn_cfg_path = os.path.join(exp_path, 'config.yaml')
+    # Heuristic benchmark
+    if not skeleton_name:
+        skeleton_name = config.get('event_detector', {}).get('heuristic', {}).get('skeleton')
 
-        if os.path.exists(nn_cfg_path):
-            try:
-                with open(nn_cfg_path, 'r') as f:
-                    nn_config = yaml.safe_load(f)
-                    skel_name = nn_config.get('data', {}).get('skeleton', 'halpe')
-            except Exception as e:
-                log("CONFIG", f"Error loading NN config at {nn_cfg_path}: {e}", level="error")
-        else:
-            log("CONFIG", f"Warning: NN config not found at {nn_cfg_path}, using default.", level="warning")
+    # Train/benchmark NeuralNet
+    if not skeleton_name:
+        skeleton_name = config.get('data', {}).get('skeleton')
 
-    return get_skeleton_by_name(skel_name)
+    # 4. Fallback / Error
+    if not skeleton_name:
+        raise ValueError("Unable to find 'skeleton' definition in config file!")
+
+    return skeleton_name.upper()
+
+
+def resolve_skeleton_from_config(config: dict):
+    """
+    Resolves the full SkeletonDefinition object based on the configuration.
+
+    Args:
+        config (dict): The configuration dictionary.
+
+    Returns:
+        SkeletonDefinition: The resolved skeleton definition object containing keypoints and links.
+    """
+    skeleton_name = resolve_skeleton_name_from_config(config)
+    return get_skeleton_by_name(skeleton_name)

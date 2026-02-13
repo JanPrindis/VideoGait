@@ -16,6 +16,7 @@ from utils.config_utils import resolve_skeleton_from_config
 from utils.gait_structs import PhaseType, GaitEventType
 from utils.json_serializer import KeypointSerializer
 from utils.logger import log
+from utils.video_processing import create_video_writer
 
 
 class GaitVisualizer:
@@ -516,4 +517,5 @@ class GaitVisualizer:
     def _create_writer(root, stem, suffix, fps, size):
         """Creates a VideoWriter instance for output."""
         path = root / f"{stem}_{suffix}.mp4"
-        return cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*'av1c'), fps, size)
+        w, h = size
+        return create_video_writer(path, fps, w, h)

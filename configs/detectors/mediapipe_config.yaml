@@ -1,4 +1,5 @@
 type: "PoseLandmarker"
+skeleton: "POSE_LANDMARKER"
 
 params:
   # Model file (detectors/google_mediapipe/models/)

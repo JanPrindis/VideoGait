@@ -33,6 +33,8 @@ from utils.visualizer import GaitVisualizer
 from utils.analysis import GaitAnalyzer
 from utils.plotting import GaitPlotter
 from utils.report_generator import ReportGenerator
+from utils.config_utils import resolve_skeleton_name_from_config
+
 
 def load_yaml(path):
     """Helper to load a YAML file."""
@@ -90,13 +92,21 @@ def run_analysis_pipeline(
     output_dir.mkdir(parents=True, exist_ok=True)
     log("PIPELINE", f"Output Directory: {output_dir}", level="info")
 
-    # --- TARGET FPS RESOLUTION ---
+    # --- TARGET FPS RESOLUTION AND USED SKELETONS ---
     detector_cfg = app_config.get('event_detector', {})
     method = detector_cfg.get('method', 'Heuristic')
+
+    # Check what skeleton is used by the detector
+    try:
+        produced_skeleton_name = resolve_skeleton_name_from_config(app_config)
+    except Exception as e:
+        log("PIPELINE", f"Failed to resolve skeleton name: {e}", level="error")
+        return None
 
     if method == 'Heuristic':
         target_fps = app_config.get('preprocessing', {}).get('framerate', 60)
         log("CONFIG", f"Method: Heuristic -> Using AppConfig framerate: {target_fps}", level="info")
+        log("PIPELINE", f"Heuristics will use skeleton: {produced_skeleton_name}", level="info")
 
     elif method == 'NeuralNet':
         exp_path = detector_cfg.get('neural_net', {}).get('experiment_path', '')
@@ -104,9 +114,21 @@ def run_analysis_pipeline(
 
         if os.path.exists(nn_config_path):
             nn_config = load_yaml(nn_config_path)
-            target_fps = nn_config.get('data', {}).get('framerate', 60)  # Default 60
+            target_fps = nn_config.get('data', {}).get('framerate', 60)
+            expected_skeleton_name = nn_config.get('data', {}).get('skeleton')
+
             log("CONFIG", f"Method: NeuralNet -> Loaded from {nn_config_path}", level="info")
             log("CONFIG", f"Target FPS: {target_fps}", level="info")
+
+            # Skeleton handshake check
+            if expected_skeleton_name.upper() != produced_skeleton_name:
+                log("PIPELINE",
+                    f"SKELETON MISMATCH ERROR! Detector uses '{produced_skeleton_name}', but NeuralNet expects '{expected_skeleton_name.upper()}'!",
+                    level="error")
+                return None
+            else:
+                log("PIPELINE", f"Skeleton Handshake OK: {produced_skeleton_name}", level="info")
+
         else:
             log("CONFIG", f"ERROR: Neural Net config not found at {nn_config_path}", level="error")
             return None

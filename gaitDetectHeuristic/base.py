@@ -3,7 +3,7 @@ import shutil
 import numpy as np
 from abc import ABC, abstractmethod
 
-from skeletons import get_skeleton_by_name
+from utils.config_utils import resolve_skeleton_from_config
 from utils.data import get_valid_range, get_keypoints, cubic_interpolate_nan, butterworth_filter, average_with_nones
 
 
@@ -45,9 +45,8 @@ class BaseHeuristicDetector(ABC):
         # Visualization
         self.save_debug_plot = self.visualization_config.get("event_detector_debug_plots", False)
 
-        skel_name = self.heuristic_config.get("skeleton", "HALPE")
         try:
-            self.skeleton = get_skeleton_by_name(skel_name)
+            self.skeleton = resolve_skeleton_from_config(full_config)
         except ValueError as e:
             raise ValueError(f"[Heuristic] Skeleton config error: {e}")
 

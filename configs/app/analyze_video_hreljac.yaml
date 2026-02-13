@@ -37,7 +37,6 @@ event_detector:
   # Heuristic configuration
   heuristic:
     method: "Hreljac"
-    skeleton: "HALPE"
 
     # Method specific parameters
     params:

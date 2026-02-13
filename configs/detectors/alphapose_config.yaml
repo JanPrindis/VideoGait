@@ -1,4 +1,5 @@
 type: "AlphaPose"
+skeleton: "HALPE"
 
 params:
   # Model configuration file (detectors/alphapose/configs/)
