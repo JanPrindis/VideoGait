@@ -5,8 +5,6 @@ preprocessing:
   min_segment_length: 60
   outlier_ratio: 0.2
 
-  use_filter: true    # Use Butterworth filter for smoothing
-
   # Butterworth filter params
   filter_cutoff: 6
   filter_order: 4

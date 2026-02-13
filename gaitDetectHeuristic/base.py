@@ -38,7 +38,6 @@ class BaseHeuristicDetector(ABC):
         self.min_segment_length = self.preprocessing_config.get("min_segment_length", 60)
         self.outlier_ratio = self.preprocessing_config.get("outlier_ratio", 0.2)
 
-        self.use_filter = self.preprocessing_config.get("use_filter", True)
         self.filter_cutoff = self.preprocessing_config.get("filter_cutoff", 6)
         self.filter_order = self.preprocessing_config.get("filter_order", 4)
 
@@ -197,11 +196,10 @@ class BaseHeuristicDetector(ABC):
             arr[:, 1] = cubic_interpolate_nan(arr[:, 1])
 
             # Smoothing
-            if self.use_filter:
-                arr[:, 0] = butterworth_filter(arr[:, 0], cutoff=self.filter_cutoff, fs=self.framerate,
-                                               order=self.filter_order)
-                arr[:, 1] = butterworth_filter(arr[:, 1], cutoff=self.filter_cutoff, fs=self.framerate,
-                                               order=self.filter_order)
+            arr[:, 0] = butterworth_filter(arr[:, 0], cutoff=self.filter_cutoff, fs=self.framerate,
+                                           order=self.filter_order)
+            arr[:, 1] = butterworth_filter(arr[:, 1], cutoff=self.filter_cutoff, fs=self.framerate,
+                                           order=self.filter_order)
 
             processed_data[kp_name] = arr
 
