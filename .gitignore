@@ -10,3 +10,5 @@ dataset/**/*.json
 
 experiments/*
 benchmarkResults/*
+
+detectors/alphapose/*
