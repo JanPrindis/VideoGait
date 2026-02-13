@@ -1,316 +1,348 @@
 import os
 import shutil
+import sys
+import time
 from glob import glob
-import cv2
+from pathlib import Path
 from tqdm import tqdm
-import subprocess
+import signal
 
-from skeletons.halpe_skeleton import HALPE_SKELETON
-from detectors.rtmlib.wrapper import RTMLib
-from utils.video_processing import RIFE_interpolate
+from utils.config_models import AppConfig, PreprocessingConfig, VisualizationConfig, VideoOutputsConfig, \
+    PoseDetectorRef, EventDetectorConfig, HeuristicConfig
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
+from detectors.builder import build_detector_from_file
 from utils.json_serializer import AnnotationSerializer
-from utils.visualizer import Visualizer
-
-_is_nvenc_available = None
-
-def is_nvenc_available():
-    """Checks if NVIDIA NVENC encoder is available in FFmpeg."""
-    global _is_nvenc_available
-    if _is_nvenc_available is None:
-        try:
-            # Run ffmpeg to list encoders and capture output
-            result = subprocess.run(
-                ['ffmpeg', '-encoders'],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            # Check for the h264_nvenc encoder in the output
-            _is_nvenc_available = 'h264_nvenc' in result.stdout
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            # If ffmpeg is not found or the command fails
-            _is_nvenc_available = False
-    return _is_nvenc_available
+from utils.video_processing import smart_interpolate, create_video_writer
+from utils.visualizer import GaitVisualizer
+from utils.logger import log
 
 
-def get_video_fps(video_path):
-    cap = cv2.VideoCapture(video_path)
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    cap.release()
-    return fps
+class GracefulKiller:
+    kill_now = False
+    def __init__(self):
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracefully)
+        self.signal_count = 0
 
+    def exit_gracefully(self, signum, frame):
+        self.signal_count += 1
+        if self.signal_count >= 2:
+            print()
+            log("DATASET", "Force kill received! Exiting immediately.", level="error")
+            log("DATASET", "WARNING: Check the output folder for potentially corrupted/incomplete files.", level="warning")
+            os._exit(1)
 
-def join_videos(first, second, output_path, output_name):
-    os.makedirs(output_path, exist_ok=True)
+        self.kill_now = True
+        print()  # Newline to clear tqdm line
+        log("DATASET", "Stop signal received! Finishing current task before exiting...", level="warning")
+        log("DATASET", "Press Ctrl+C again to force quit immediately.", level="warning")
 
-    caps = [cv2.VideoCapture(first), cv2.VideoCapture(second)]
-    tot_frame = int(caps[0].get(cv2.CAP_PROP_FRAME_COUNT)) + int(caps[1].get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = caps[0].get(cv2.CAP_PROP_FPS)
-    width = int(caps[0].get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(caps[0].get(cv2.CAP_PROP_FRAME_HEIGHT))
+# ==========================================
+# HELPERS
+# ==========================================
 
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    writer = cv2.VideoWriter(f"{output_path}/{output_name}", fourcc, fps, (width, height))
+def _parse_filename(filename):
+    """Parses patient info from filename: ID_Disease_Direction_Severity.ext"""
+    base = os.path.basename(filename)
+    name_only = os.path.splitext(base)[0] # Remove extension
+    parts = name_only.split("_")
 
-    pbar = tqdm(total=tot_frame, leave=False, desc=f"Merging", unit="Frame")
-    for cap in caps:
-        while cap.isOpened():
-            success, frame = cap.read()
-
-            if not success:
-                break
-
-            writer.write(frame)
-            pbar.update(1)
-        cap.release()
-
-    pbar.close()
-    writer.release()
-
-
-def parse_filename(filename):
-    base = os.path.basename(filename).replace(".MOV", "")
-    parts = base.split("_")
+    if len(parts) < 3:
+        return None # Invalid format
 
     patient_id = parts[0]
     disease_type = parts[1]
     direction = parts[2]  # 01 / 02
-
-    severity = None
-    if len(parts) > 3:
-        severity = parts[3]
+    severity = parts[3] if len(parts) > 3 else None
 
     return patient_id, disease_type, direction, severity
 
+def _get_detector_name(config_path):
+    """Extracts detector name from config path"""
+    stem = Path(config_path).stem
+    return stem.replace("_config", "").replace("config_", "")
 
-def merge_videos(dataset_root_path, blacklist=None):
-    all_videos = glob(f"{dataset_root_path}/**/*.MOV", recursive=True)
 
-    # Filter out blacklisted videos
-    blacklist = set(blacklist or [])
-    all_videos = [v for v in all_videos if not any(bad in os.path.basename(v) for bad in blacklist)]
+def _create_minimal_config(config_path, confidence=0.4):
+    """
+    Creates a basic app configuration object to satisfy GaitVisualizer.
+    """
+    return AppConfig(
+        preprocessing=PreprocessingConfig(
+            confidence_threshold=confidence,
+        ),
 
-    pairs = {}
-    message_log = []
+        visualization=VisualizationConfig(
+            colors={
+                "left": "#00BFFF",
+                "right": "#FF4500",
+                "center": "#ADFF2F",
+                "dimmed": [128, 128, 128]
+            },
+            line_thickness=2,
+            keypoint_radius=4,
+            footprint_duration=0,
+            outputs=VideoOutputsConfig(
+                enable_overlay=True,
+                enable_kinematics=False,
+                enable_logic=False
+            )
+        ),
 
-    for vid in all_videos:
-        patient_id, dtype, direction, severity = parse_filename(vid)
-        key = (patient_id, dtype, severity)
+        pose_detector=PoseDetectorRef(
+            config_path=config_path
+        ),
 
-        if key not in pairs:
-            pairs[key] = {}
+        # Dummy event detector
+        event_detector=EventDetectorConfig(
+            method="Heuristic",
+            heuristic=HeuristicConfig(method="dummy")
+        )
+    )
 
-        pairs[key][direction] = vid
+# ==========================================
+# MAIN PIPELINE STEPS
+# ==========================================
 
-    total = len(pairs)
-    pbar = tqdm(total=total, desc="Processing videos", unit="Patient")
+def merge_videos(dataset_root, blacklist, killer=None):
+    """Merges 01 and 02 videos into one continuous shot."""
+    log("DATASET", "Merging videos...", level="info")
 
-    # The output directory is now flat, without subfolders for disease type
-    out_dir = os.path.join(dataset_root_path, "MERGED")
+    # Input: Recursive search for MOV
+    all_videos = glob(f"{dataset_root}/**/*.MOV", recursive=True)
+    all_videos = [v for v in all_videos if os.path.basename(v) not in blacklist]
+
+    # Output dir
+    out_dir = os.path.join(dataset_root, "MERGED")
     os.makedirs(out_dir, exist_ok=True)
 
-    for (pid, dtype, sev), dct in pairs.items():
+    # Group by patient/disease/severity
+    pairs = {}
+    for vid in all_videos:
+        parsed = _parse_filename(vid)
+        if not parsed: continue
+
+        pid, dtype, direction, sev = parsed
+        key = (pid, dtype, sev)
+
+        if key not in pairs: pairs[key] = {}
+        pairs[key][direction] = vid
+
+    # Process
+    for (pid, dtype, sev), dct in tqdm(pairs.items(), desc="Merging pairs"):
+        if killer and killer.kill_now:
+            log("DATASET", "Graceful exit during merging.", level="warning")
+            return
+
         suffix = f"_{sev}" if sev else ""
 
+        # Define output name
         if "01" in dct and "02" in dct:
-            # Merge
             out_name = f"{dtype}_{pid}{suffix}.mp4"
-            join_videos(dct["01"], dct["02"], out_dir, out_name)
+            out_path = os.path.join(out_dir, out_name)
+
+            if os.path.exists(out_path):
+                continue
+
+            _join_videos(dct["01"], dct["02"], out_path)
 
         elif "01" in dct:
             out_name = f"{dtype}_{pid}{suffix}_01.mp4"
-            shutil.copy(dct["01"], os.path.join(out_dir, out_name))
-            message_log.append(f"[SingleCopy] {pid} {dtype} {sev}")
+            out_path = os.path.join(out_dir, out_name)
+            if os.path.exists(out_path):
+                continue
+            shutil.copy(dct["01"], out_path)
 
         elif "02" in dct:
             out_name = f"{dtype}_{pid}{suffix}_02.mp4"
-            shutil.copy(dct["02"], os.path.join(out_dir, out_name))
-            message_log.append(f"[SingleCopy] {pid} {dtype} {sev}")
-
-        else:
-            message_log.append(f"Something went terribly wrong for {pid} {dtype} {sev}")
-
-        pbar.update(1)
-
-    pbar.close()
-
-    if message_log:
-        print("Log:")
-        for msg in message_log:
-            print(msg)
+            out_path = os.path.join(out_dir, out_name)
+            if os.path.exists(out_path):
+                continue
+            shutil.copy(dct["02"], out_path)
 
 
-def interpolate_video_fps(orig_video_path, out_video_path, target_fps):
-    orig_fps = get_video_fps(orig_video_path)
-    temp_video_path = None
+def _join_videos(vid1, vid2, out_path):
+    """Helper for joining two videos."""
+    import cv2
+    caps = [cv2.VideoCapture(vid1), cv2.VideoCapture(vid2)]
 
-    if orig_fps == target_fps:
-        shutil.copy(orig_video_path, out_video_path)
-        return
+    fps = caps[0].get(cv2.CAP_PROP_FPS)
+    w = int(caps[0].get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(caps[0].get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    encoder = "h264_nvenc" if is_nvenc_available() else "libx264"
+    writer = create_video_writer(out_path, fps, w, h)
 
-    def run_ffmpeg_with_progress(command, total_frames):
-        process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-            encoding='utf-8')
-
-        pbar = tqdm(total=total_frames, desc="minterpolate", unit="frame", leave=False)
-
-        for line in process.stdout:
-            if "frame=" in line:
-                try:
-                    parts = line.split()
-                    frame_index = parts.index("frame=")
-                    current_frame = int(parts[frame_index + 1])
-                    pbar.update(current_frame - pbar.n)
-                except (ValueError, IndexError):
-                    pass # Ignore malformed lines
-        pbar.close()
-        process.wait()
-
-    if orig_fps == 30:
-        if target_fps == 60:
-            RIFE_interpolate(video=orig_video_path, output=out_video_path, exp=1, ext="mp4")
-        elif target_fps == 120:
-            RIFE_interpolate(video=orig_video_path, output=out_video_path, exp=2, ext="mp4")
-        else:
-            raise ValueError(f"Unsupported target FPS for 30fps video: {target_fps}")
-    elif orig_fps == 50:
-        cap = cv2.VideoCapture(orig_video_path)
-        orig_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    for cap in caps:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret: break
+            writer.write(frame)
         cap.release()
-
-        if target_fps == 60:
-            total_frames = int(orig_frame_count * (60 / orig_fps))
-            command = ["ffmpeg", "-i", orig_video_path, "-vf", "minterpolate=fps=60", "-c:v", encoder, "-y", out_video_path]
-            run_ffmpeg_with_progress(command, total_frames)
-        elif target_fps == 120:
-            temp_video_path = out_video_path.replace(".mp4", "_temp.mp4")
-            total_frames = int(orig_frame_count * (60 / orig_fps))
-            command = ["ffmpeg", "-i", orig_video_path, "-vf", "minterpolate=fps=60", "-c:v", encoder, "-y", temp_video_path]
-            run_ffmpeg_with_progress(command, total_frames)
-            RIFE_interpolate(video=temp_video_path, output=out_video_path, exp=1, ext="mp4")
-        else:
-            raise ValueError(f"Unsupported target FPS for 50fps video: {target_fps}")
-    elif orig_fps == 24:
-        cap = cv2.VideoCapture(orig_video_path)
-        orig_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        cap.release()
-
-        temp_video_path_30 = out_video_path.replace(".mp4", "_temp_30.mp4")
-        total_frames = int(orig_frame_count * (30 / orig_fps))
-        command = ["ffmpeg", "-i", orig_video_path, "-vf", "minterpolate=fps=30", "-c:v", encoder, "-y", temp_video_path_30]
-        run_ffmpeg_with_progress(command, total_frames)
-        if target_fps == 60:
-            RIFE_interpolate(video=temp_video_path_30, output=out_video_path, exp=1, ext="mp4")
-        elif target_fps == 120:
-            RIFE_interpolate(video=temp_video_path_30, output=out_video_path, exp=2, ext="mp4")
-        else:
-            raise ValueError(f"Unsupported target FPS for 24fps video: {target_fps}")
-        temp_video_path = temp_video_path_30
-    elif orig_fps == 60:
-        if target_fps == 120:
-            RIFE_interpolate(video=orig_video_path, output=out_video_path, exp=1, ext="mp4")
-        else:
-            raise ValueError(f"Unsupported target FPS for 60fps video: {target_fps}")
-    else:
-        raise ValueError(f"Unsupported original FPS: {orig_fps}")
-
-    if temp_video_path and os.path.exists(temp_video_path):
-        os.remove(temp_video_path)
+    writer.release()
 
 
-def interpolate_all_videos(dataset_root_path, interpolate_to: list[int]):
-    merged_dir = os.path.join(dataset_root_path, "MERGED")
-    interpolated_root = os.path.join(dataset_root_path, "INTERPOLATED")
+def interpolate(dataset_root, target_fps_list, killer=None):
+    """
+    Interpolates merged videos to target framerate.
+    Uses chaining: Output of lower FPS is used as input for higher FPS to save time.
+    """
+    # Order target framerate for chaining
+    target_fps_list = sorted(target_fps_list)
+    log("DATASET", f"Interpolating to {target_fps_list} FPS (Chained)...", level="info")
 
-    all_videos = glob(f"{merged_dir}/*.mp4", recursive=True)
+    merged_dir = os.path.join(dataset_root, "MERGED")
+    interp_root = os.path.join(dataset_root, "INTERPOLATED")
 
-    for target_fps in interpolate_to:
-        interpolated_dir = os.path.join(interpolated_root, str(target_fps))
-        os.makedirs(interpolated_dir, exist_ok=True)
+    # Find all videos in MERGED
+    src_videos = glob(os.path.join(merged_dir, "*.mp4"))
 
-        pbar = tqdm(all_videos, desc=f"Interpolating videos to {target_fps}fps", unit="video")
-        for video_path in pbar:
-            # No subdirectories needed, filename contains all info
-            base_name = os.path.basename(video_path)
-            out_file = os.path.join(interpolated_dir, base_name)
+    # Map: File name -> Path to latest version
+    current_source_map = {os.path.basename(v): v for v in src_videos}
 
-            try:
-                interpolate_video_fps(video_path, out_file, target_fps)
-            except ValueError as e:
-                print(f"Skipping {video_path}: {e}")
+    for fps in target_fps_list:
+        out_dir = os.path.join(interp_root, str(fps))
+        os.makedirs(out_dir, exist_ok=True)
 
+        if killer and killer.kill_now:
+            return
 
-def process_videos(dataset_root_path, detector, visualizer=None):
-    processed_root = os.path.join(dataset_root_path, "PROCESSED")
+        for filename, src_path in tqdm(current_source_map.items(), desc=f"Interpolating to {fps}"):
+            if killer and killer.kill_now:
+                log("DATASET", "Graceful exit during interpolation.", level="warning")
+                return
 
-    modes_to_process = [
-        {
-            "name": "INTERPOLATED 60",
-            "input_dir": os.path.join(dataset_root_path, "INTERPOLATED", "60"),
-            "output_dir": os.path.join(processed_root, "60")
-        },
-        {
-            "name": "INTERPOLATED 120",
-            "input_dir": os.path.join(dataset_root_path, "INTERPOLATED", "120"),
-            "output_dir": os.path.join(processed_root, "120")
-        }
-    ]
+            out_path = os.path.join(out_dir, filename)
 
-    for mode in modes_to_process:
-        input_dir = mode["input_dir"]
-        output_dir = mode["output_dir"]
-        mode_name = mode["name"]
-
-        all_videos = glob(f"{input_dir}/**/*.mp4", recursive=True)
-        pbar = tqdm(all_videos, desc=f"Running inference ({mode_name})", unit="video")
-
-        for video_path in pbar:
-            keypoint_dir = os.path.join(output_dir, "KEYPOINTS")
-            annotated_dir = os.path.join(output_dir, "ANNOTATED")
-            os.makedirs(keypoint_dir, exist_ok=True)
-            os.makedirs(annotated_dir, exist_ok=True)
-
-            base_name = os.path.basename(video_path)
-            json_name = base_name.replace('.mp4', '.json')
-            annotated_name = base_name
-
-            try:
-                detector.detect(video_path=video_path, output_path=keypoint_dir)
-            except Exception as e:
-                print(f"[ERROR] Inference failed for {video_path}: {e}")
+            if os.path.exists(out_path):
+                # If exists - just update the map
+                current_source_map[filename] = out_path
                 continue
 
             try:
-                if visualizer is not None:
-                    visualizer.visualize(
-                        original_video=video_path,
-                        visualizer_output_path=annotated_dir,
-                        visualizer_output_file=annotated_name,
-                        detector_output_path=keypoint_dir,
-                        detector_output_file=json_name,
-                        confidence_threshold=0.6
-                    )
+                # Interpolate from previous version
+                smart_interpolate(src_path, out_path, target_fps=fps)
+
+                # Success - update map
+                current_source_map[filename] = out_path
+
             except Exception as e:
-                print(f"[ERROR] Visualization failed for {video_path}: {e}")
+                log("DATASET", f"Failed to interpolate {filename}: {e}", level="error")
+                # On error, we don't update the map as a fallback measure
 
-        pbar.close()
+
+def detect_and_visualize(dataset_root, target_fps_list, detector_configs, skip_visualization=False, killer=None):
+    """Runs pose detection and basic visualization for all combinations."""
+    log("DATASET", "Running detection and visualization...", level="info")
+
+    interp_root = os.path.join(dataset_root, "INTERPOLATED")
+    processed_root = os.path.join(dataset_root, "PROCESSED")
+
+    # Iterate over FPS
+    for fps in target_fps_list:
+        if killer and killer.kill_now:
+            return
+
+        src_dir = os.path.join(interp_root, str(fps))
+        if not os.path.exists(src_dir):
+            log("DATASET", f"Skipping {fps} FPS (directory not found)", level="warning")
+            continue
+
+        videos = glob(os.path.join(src_dir, "*.mp4"))
+
+        # Iterate over Detectors
+        for config_path, conf_thresh in detector_configs:
+            if killer and killer.kill_now:
+                return
+
+            det_name = _get_detector_name(config_path)
+
+            log("DATASET", f"Processing: FPS={fps} | Detector={det_name}", level="info")
+
+            # Prepare paths
+            # PROCESSED/{detector}/{fps}/KEYPOINTS
+            kp_out_dir = os.path.join(processed_root, det_name, str(int(fps)), "KEYPOINTS")
+            # PROCESSED/{detector}/{fps}/ANNOTATED
+            vis_out_dir = os.path.join(processed_root, det_name, str(int(fps)), "ANNOTATED")
+
+            os.makedirs(kp_out_dir, exist_ok=True)
+            os.makedirs(vis_out_dir, exist_ok=True)
+
+            # Build detector
+            try:
+                detector = build_detector_from_file(config_path)
+            except Exception as e:
+                log("DATASET", f"Could not build detector {det_name}: {e}", level="error")
+                continue
+
+            # Build Visualizer with fake config
+            fake_config = _create_minimal_config(config_path=config_path, confidence=conf_thresh)
+
+            try:
+                visualizer = GaitVisualizer(fake_config)
+            except Exception as e:
+                log("DATASET", f"Could not initialize Visualizer for {det_name}: {e}", level="error")
+                continue
+
+            # Process Videos
+            for video_path in tqdm(videos, unit="vid"):
+                if killer and killer.kill_now:
+                    log("DATASET", "Graceful exit during detection/visualization.", level="warning")
+                    return
+
+                base_name = os.path.basename(video_path)
+                json_name = base_name.replace(".mp4", ".json")
+
+                json_out_path = os.path.join(kp_out_dir, json_name)
+
+                # Detection
+                if not os.path.exists(json_out_path):
+                    try:
+                        # Output path for detector is the directory, or full path depending on implementation.
+                        # RTMLib wrapper typically takes output_path as directory.
+                        detector.detect(video_path, kp_out_dir)
+                    except Exception as e:
+                        log("DATASET", f"Detection failed for {base_name}: {e}", level="error")
+                        continue
+
+                # Visualization
+                # Visualizer creates its own filenames, usually {stem}_inspection.mp4
+
+                if not skip_visualization:
+                    # We need to check if it already exists to avoid re-rendering
+                    expected_vis_output = os.path.join(vis_out_dir, base_name.replace(".mp4", "_inspection.mp4"))
+
+                    if not os.path.exists(expected_vis_output):
+                        try:
+                            visualizer.process_video(
+                                video_path=video_path,
+                                output_root=vis_out_dir,
+                                keypoints_data=json_out_path
+                            )
+                        except Exception as e:
+                            log("DATASET", f"Visualization failed for {base_name}: {e}", level="error")
 
 
-def recalculate_annotations(annotations_root_path):
+def recalculate_annotations(annotations_root_path, killer=None):
     all_files = glob(annotations_root_path + "/ORIGINAL/*.json")
 
     for out_framerate in [60, 120]:
+        if killer and killer.kill_now:
+            return
+
         out_path = os.path.join(annotations_root_path, f"{out_framerate}")
         os.makedirs(out_path, exist_ok=True)
 
         pbar = tqdm(all_files, desc = f"Recalculating annotations to {out_framerate}fps", unit = "video", leave=False)
         for file in all_files:
+            if killer and killer.kill_now:
+                log("DATASET", "Graceful exit during annotation recalculation.", level="warning")
+                pbar.close()
+                return
+
             base_name = os.path.basename(file)
 
             data = AnnotationSerializer.load(file)
@@ -348,33 +380,46 @@ if __name__ == "__main__":
         "003_PD_02_SV.MOV", #
     ]
 
+
+    detector_configs = [
+        (f"{PROJECT_ROOT}/configs/detectors/rtmlib_config.yaml", 0.3),
+        (f"{PROJECT_ROOT}/configs/detectors/alphapose_config.yaml", 0.01),
+        (f"{PROJECT_ROOT}/configs/detectors/mediapipe_config.yaml", 0.2),
+    ]
+
     # Fix ONNX not finding CUDA dlls
     import onnxruntime
     # Preload DLLs from NVIDIA site packages
     onnxruntime.preload_dlls(directory="")
 
+    killer = GracefulKiller()
+
+    log("DATASET", "This takes a really long time, even on GPU!", level="warning")
+    log("DATASET", "You can stop this script and resume later by pressing Ctrl+C.", level="warning")
+    log("DATASET", "Press Ctrl+C again to force quit immediately.", level="warning")
+    time.sleep(5)
+
     # Merge
-    merge_videos(dataset_root_path, blacklist)
+    merge_videos(dataset_root_path, blacklist, killer=killer)
 
     # Interpolate
     # This process can be slow. To optimize, first interpolate videos to 60fps.
     # Then, replace the original videos with these 60fps versions before interpolating to 120fps.
     # This strategy leverages RIFE for the second interpolation, which is significantly faster with a CUDA-enabled GPU,
     # as it avoids repeated use of FFmpeg's minterpolate.
-    interpolate_all_videos(dataset_root_path, interpolate_to=[60, 120])
+    interpolate(dataset_root_path, target_fps_list=[60, 120], killer=killer)
 
     # Process and visualize
-    rtmlib = RTMLib()                                       # Can be any keypoint detector
-    vis = Visualizer(skeleton_definition=HALPE_SKELETON)    # Skeleton is based on the detector's output
-
-    # To skip visualization, pass None as visualizer in the parameter
-    process_videos(
-        dataset_root_path,
-        detector=rtmlib,
-        visualizer=vis
+    detect_and_visualize(
+        dataset_root=dataset_root_path,
+        detector_configs=detector_configs,
+        # target_fps_list=[60, 120],
+        target_fps_list=[120],
+        skip_visualization=False,    # If you don't care about visualization, you can skip it
+        killer=killer
     )
 
     # Update annotations
     # This is not required, as the annotations are already pre-calculated.
     # Only use if the 60/120 folders are missing in the annotations folder.
-    # recalculate_annotations(annotations_root_path)
+    # recalculate_annotations(annotations_root_path, killer=killer)
