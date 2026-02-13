@@ -375,24 +375,82 @@ def interpolate_minterpolate(input_video, output_video, target_fps=120):
     Interpolates a video to a target FPS using FFmpeg's minterpolate filter.
 
     Args:
-        input_video (str): Path to the input video file.
-        output_video (str): Path to the output video file.
-        target_fps (int): The desired output FPS.
+        input_video (str): Path to input video.
+        output_video (str): Path to output video.
+        target_fps (int, optional): Target framerate. Defaults to 120.
     """
-    command = [
-        'ffmpeg',
-        '-i', input_video,
-        '-vf', f'minterpolate=fps={target_fps}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir',
-        '-c:v', 'libx264',
-        '-crf', '18',
-        '-preset', 'slow',
-        output_video
-    ]
 
+    # Get input video length for progress bar
+    cap = cv2.VideoCapture(input_video)
+    if not cap.isOpened():
+        log("VIDEO", f"Cannot open video for metadata: {input_video}", level="error")
+        return
+
+    input_fps = cap.get(cv2.CAP_PROP_FPS)
+    input_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+
+    # Calculate expected frame number (InputFrames * (Target / Input))
+    if input_fps <= 0: input_fps = 30  # Div by zero fallback
+    expected_output_frames = int(input_frames * (target_fps / input_fps))
+
+    # Get the best available encoder
+    config = _get_best_encoder_config()
+
+    # Command
+    command = [
+        'ffmpeg', '-y',
+        '-i', input_video,
+        '-vf', f'minterpolate=fps={target_fps}:mi_mode=mci:mc_mode=obmc:me_mode=bidir',
+        '-c:v', config['codec'],
+    ]
+    command.extend(config['params'])
+    command.append(output_video)
+
+    # Run and read output
     try:
-        subprocess.run(command, check=True, capture_output=True, text=True)
-    except subprocess.CalledProcessError as e:
-        log("VIDEO", f"Error interpolating {input_video}:\n{e.stderr}", level="error")
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,  # Text mode
+            encoding='utf-8',
+            errors='replace'
+        )
+
+        # Regex for searching frame numbers "frame=  123"
+        frame_pattern = re.compile(r"frame=\s*(\d+)")
+
+        # TQDM Progress Bar
+        pbar = tqdm(total=expected_output_frames, desc=f"Minterpolate {input_fps:.1f}->{target_fps}", unit="fr",
+                    leave=False)
+
+        # Read output and try to find frame numbers
+        while True:
+            line = process.stderr.readline()
+            if not line and process.poll() is not None:
+                break  # End
+
+            if line:
+                match = frame_pattern.search(line)
+                if match:
+                    current_frame = int(match.group(1))
+
+                    # Update progress bar with current frame
+                    pbar.n = current_frame
+                    pbar.refresh()
+
+        pbar.close()
+
+        # Check return code
+        if process.returncode != 0:
+            err_msg = f"FFmpeg error in {input_video} (Code: {process.returncode})"
+            log("VIDEO", err_msg, level="error")
+            raise RuntimeError(err_msg)
+
+    except Exception as e:
+        log("VIDEO", f"Error interpolating {input_video}: {e}", level="error")
+        raise
 
 
 def get_video_fps(video_path):
