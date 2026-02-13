@@ -1,4 +1,4 @@
-experiment_name: "BiGRU_RTMLIB"
+experiment_name: "Transformer"
 
 preprocessing:
   confidence_threshold: 0.4
@@ -12,7 +12,7 @@ preprocessing:
 
 data:
   # Relative path from PROJECT_ROOT
-  dataset_root: "dataset/PROCESSED"
+  dataset_root: "dataset/PROCESSED/rtmlib"
   annotation_root: "annotations"
   framerate: 60
 
@@ -62,27 +62,31 @@ data:
       - ["LEFT_KNEE", "RIGHT_KNEE"]
 
 model:
-  type: "GaitBiGRU"
+  type: "GaitTransformer"
   params:
-    num_layers: 2
-    hidden_dim: 512
-    dense_units: 64
-    dropout: 0.2
-    num_classes: 4
+      d_model: 64           # Embedding size
+      n_head: 8              # Number of attention heads
+      num_layers: 1          # Number of encoder layers (depth)
+      dim_feedforward: 256   # Expansion factor for MLP
+      dropout: 0.05
+      kernel_size: 15
+      padding: 7             # (kernel_size // 2)
+      num_classes: 4
 
 training:
   optimizer: "AdamW"
   f1_window_size_ms: 50
-  learning_rate: 0.001
-  weight_decay: 0.00005
+  learning_rate: 0.0025
+  weight_decay: 0.00003
   momentum: 0.9
   batch_size: 16
   epochs: 200
   seed: 3               # Training/Validation split seed
 
+  # Optional scheduler config
   scheduler: "OneCycleLR"
   scheduler_config:
-    pct_start: 0.3
-    div_factor: 25.0
-    final_div_factor: 10000.0
-    anneal_strategy: "cos"
+    pct_start: 0.3            # warmup
+    div_factor: 25.0          # start_lr = max_lr / div_factor
+    final_div_factor: 10000.0 # final_lr = max_lr / final_div_factor
+    anneal_strategy: "cos"    # cos | linear

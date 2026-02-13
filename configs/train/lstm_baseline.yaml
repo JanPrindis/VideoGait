@@ -1,4 +1,4 @@
-experiment_name: "LSTM_RTMLIB_Paper"
+experiment_name: "LSTM_Paper"
 
 preprocessing:
   confidence_threshold: 0.4
@@ -12,7 +12,7 @@ preprocessing:
 
 data:
   # Relative path from PROJECT_ROOT
-  dataset_root: "dataset/PROCESSED"
+  dataset_root: "dataset/PROCESSED/rtmlib"
   annotation_root: "annotations"
   framerate: 60
 

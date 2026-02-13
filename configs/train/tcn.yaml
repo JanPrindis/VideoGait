@@ -1,4 +1,4 @@
-experiment_name: "BiLSTM_RTMLIB"
+experiment_name: "TCN"
 
 preprocessing:
   confidence_threshold: 0.4
@@ -12,7 +12,7 @@ preprocessing:
 
 data:
   # Relative path from PROJECT_ROOT
-  dataset_root: "dataset/PROCESSED"
+  dataset_root: "dataset/PROCESSED/rtmlib"
   annotation_root: "annotations"
   framerate: 60
 
@@ -62,19 +62,18 @@ data:
       - ["LEFT_KNEE", "RIGHT_KNEE"]
 
 model:
-  type: "GaitBiLSTM"
+  type: "GaitTCN"
   params:
-    num_layers: 2
-    hidden_dim: 512
-    dense_units: 32
-    dropout: 0.28
+    num_channels: [256, 256, 256, 256]
+    kernel_size: 5
+    dropout: 0.2
     num_classes: 4
 
 training:
   optimizer: "AdamW"
   f1_window_size_ms: 50
-  learning_rate: 0.0014
-  weight_decay: 0.00008
+  learning_rate: 0.0047
+  weight_decay: 0.00014
   momentum: 0.9
   batch_size: 16
   epochs: 200
