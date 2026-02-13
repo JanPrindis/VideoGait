@@ -136,25 +136,6 @@ class AlphaPose(BaseDetector):
                 min_box_area=0
             )
 
-            # MONKEY PATCH: Fix hardcoded relative paths in YOLOXDetector
-            # We intercept the initialization to inject absolute paths for model weights.
-            # try:
-            #     from detector import yolox_api
-            #     if not getattr(yolox_api.YOLOXDetector, "_patched", False):
-            #         _original_init = yolox_api.YOLOXDetector.__init__
-            #
-            #         def _patched_init(instance, cfg, opt=None):
-            #             default_weights = "detector/yolox/data/yolox_x.pth"
-            #             rel_path = cfg.get("MODEL_WEIGHTS", default_weights)
-            #             if not os.path.isabs(rel_path):
-            #                 cfg["MODEL_WEIGHTS"] = str(self.base_dir / rel_path)
-            #             _original_init(instance, cfg, opt)
-            #
-            #         yolox_api.YOLOXDetector.__init__ = _patched_init
-            #         yolox_api.YOLOXDetector._patched = True
-            # except ImportError:
-            #     pass
-
             # INIT MODULES
             from detector.apis import get_detector
             det_loader = DetectionLoader(
