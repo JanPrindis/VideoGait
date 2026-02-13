@@ -7,9 +7,6 @@ from pathlib import Path
 from tqdm import tqdm
 import signal
 
-from utils.config_models import AppConfig, PreprocessingConfig, VisualizationConfig, VideoOutputsConfig, \
-    PoseDetectorRef, EventDetectorConfig, HeuristicConfig
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.append(str(PROJECT_ROOT))
@@ -19,7 +16,8 @@ from utils.json_serializer import AnnotationSerializer
 from utils.video_processing import smart_interpolate, create_video_writer
 from utils.visualizer import GaitVisualizer
 from utils.logger import log
-
+from utils.config_models import AppConfig, PreprocessingConfig, VisualizationConfig, VideoOutputsConfig, \
+    PoseDetectorRef, EventDetectorConfig, HeuristicConfig
 
 class GracefulKiller:
     kill_now = False
