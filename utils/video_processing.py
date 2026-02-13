@@ -1,17 +1,23 @@
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 import cv2
 import torch
 import warnings
 import numpy as np
 
-from matplotlib.pyplot import title
 from torch.nn import functional as F
 from tqdm import tqdm
 from utils.logger import log
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.append(str(PROJECT_ROOT))
+
 
 # old numpy compatibility (np.float -> float...)
 with warnings.catch_warnings():
@@ -128,7 +134,12 @@ def RIFE_interpolate(
     # Load model
     from rife.train_log.RIFE_HDv3 import Model
     model = Model()
-    model.load_model("rife/train_log", -1)
+    model_dir = PROJECT_ROOT / "rife" / "train_log"
+
+    if not model_dir.exists():
+        raise FileNotFoundError(f"RIFE model directory not found at: {model_dir}")
+
+    model.load_model(str(model_dir), -1)
     model.eval()
     model.device()
 
