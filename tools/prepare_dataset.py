@@ -364,8 +364,8 @@ def recalculate_annotations(annotations_root_path, killer=None):
 
 
 if __name__ == "__main__":
-    annotations_root_path = "../annotations"
-    dataset_root_path = "../dataset"
+    annotations_root_path = os.path.join(str(PROJECT_ROOT), "annotations")
+    dataset_root_path = os.path.join(str(PROJECT_ROOT), "dataset")
     blacklist = [
         "002_NM_01.MOV", # Bad crop
         "004_NM_01.MOV", # Bad crop
@@ -411,8 +411,7 @@ if __name__ == "__main__":
     detect_and_visualize(
         dataset_root=dataset_root_path,
         detector_configs=detector_configs,
-        # target_fps_list=[60, 120],
-        target_fps_list=[120],
+        target_fps_list=[60, 120],
         skip_visualization=False,    # If you don't care about visualization, you can skip it
         killer=killer
     )
