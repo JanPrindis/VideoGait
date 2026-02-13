@@ -222,7 +222,7 @@ class Trainer:
 
         except Exception as e:
             log("TRAINER", f"Something went wrong during training: {e}", level="error")
-            pass
+            raise
 
         finally:
             if self.best_val_f1 == -1.0:
