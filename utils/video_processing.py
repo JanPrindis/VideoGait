@@ -27,7 +27,172 @@ with warnings.catch_warnings():
             setattr(np, alias, dtype)
 
 
-# Video reader replacement
+class FFmpegPipeWriter:
+    """
+    Writes video directly to FFmpeg subprocess via stdin pipe.
+    Bypasses OpenCV VideoWriter completely to avoid DLL/Codec issues.
+    """
+
+    def __init__(self, filename, fps, width, height):
+        """
+        Initializes the FFmpeg pipe writer.
+
+        Args:
+            filename (str): Output video filename.
+            fps (float): Frames per second.
+            width (int): Video width.
+            height (int): Video height.
+        """
+        self.filename = str(filename)
+        self.width = int(width)
+        self.height = int(height)
+
+        # H264/AV1 requires even resolution value
+        vf_filters = []
+        target_w = self.width
+        target_h = self.height
+
+        if target_w % 2 != 0:
+            target_w -= 1
+            vf_filters.append(f"crop={target_w}:{self.height}:0:0")
+
+        if target_h % 2 != 0:
+            target_h -= 1
+            vf_filters.append(f"crop={target_w}:{target_h}:0:0")
+
+        vf_arg = ",".join(vf_filters)
+
+        # Detect best available encoder
+        encoder_config = _get_best_encoder_config()
+        codec = encoder_config['codec']
+
+        # Command
+        cmd = [
+            'ffmpeg', '-y',
+            '-f', 'rawvideo',
+            '-vcodec', 'rawvideo',
+            '-s', f'{self.width}x{self.height}',
+            '-pix_fmt', 'bgr24',  # OpenCV default format
+            '-r', str(fps),
+            '-i', '-',  # Input from STDIN (Pipe)
+
+            '-c:v', codec,
+            '-pix_fmt', 'yuv420p',  # Web compatibility
+        ]
+
+        if vf_arg:
+            cmd.extend(['-vf', vf_arg])
+
+        # Extend with encoder params
+        cmd.extend(encoder_config['params'])
+        cmd.append(self.filename)
+
+        # Run
+        self.process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,  # To prevent deadlocks
+            stderr=subprocess.DEVNULL   # --------------------
+        )
+        self.active = True
+
+    def write(self, frame):
+        """
+        Writes a single frame to the FFmpeg pipe.
+
+        Args:
+            frame (np.ndarray): Image frame (BGR format).
+        """
+        if not self.active: return
+        try:
+            self.process.stdin.write(frame.tobytes())   # Raw video
+        except (IOError, BrokenPipeError) as e:
+            self.release()
+            raise RuntimeError(f"FFmpeg pipe broke while writing frame: {e}")
+
+    def release(self):
+        """Closes the pipe and waits for the process to finish."""
+        if self.active:
+            if self.process.stdin:
+                self.process.stdin.close()
+            self.process.wait()
+            self.active = False
+
+    def is_opened(self):
+        """Checks if the FFmpeg process is still running."""
+        return self.active and self.process.poll() is None
+
+
+# Encoder cache
+_ffmpeg_encoders = None
+
+
+def _get_best_encoder_config():
+    """
+    Detects available FFmpeg encoders and returns the best configuration.
+
+    Priority:
+    1. AV1 NVENC (HW)
+    2. AV1 SVT (SW)
+    3. H264 NVENC (HW)
+    4. H264 LIBX264 (SW)
+    5. MPEG4 (Backup)
+
+    Returns:
+        dict: Dictionary containing 'codec' and 'params'.
+    """
+    global _ffmpeg_encoders
+    if _ffmpeg_encoders is None:
+        try:
+            res = subprocess.run(['ffmpeg', '-encoders'], capture_output=True, text=True)
+            _ffmpeg_encoders = res.stdout
+        except:
+            _ffmpeg_encoders = ""
+
+    # 1. AV1 NVIDIA (Hardware)
+    if 'av1_nvenc' in _ffmpeg_encoders:
+        return {'codec': 'av1_nvenc', 'params': ['-rc', 'vbr', '-cq', '30', '-preset', 'p4']}
+
+    # 2. AV1 Software (SVT-AV1)
+    if 'libsvtav1' in _ffmpeg_encoders:
+        return {'codec': 'libsvtav1', 'params': ['-crf', '35', '-preset', '8', '-g', '240']}
+
+    # 3. H.264 NVIDIA (Hardware)
+    if 'h264_nvenc' in _ffmpeg_encoders:
+        return {'codec': 'h264_nvenc', 'params': ['-rc', 'vbr', '-cq', '23', '-preset', 'p4']}
+
+    # 4. H.264 Software (libx264)
+    if 'libx264' in _ffmpeg_encoders:
+        return {'codec': 'libx264', 'params': ['-crf', '23', '-preset', 'fast']}
+
+    # 5. MPEG-4 (Last Resort Backup)
+    return {'codec': 'mpeg4', 'params': ['-q:v', '5']}
+
+
+def create_video_writer(path, fps, width, height):
+    """
+    Factory function that returns an FFmpegPipeWriter instance.
+
+    Args:
+        path (str): Output video path.
+        fps (float): Frames per second.
+        width (int): Video width.
+        height (int): Video height.
+
+    Returns:
+        FFmpegPipeWriter: The initialized writer.
+
+    Raises:
+        RuntimeError: If FFmpeg is not installed or found in PATH.
+    """
+    # Check if ffmpeg exists
+    try:
+        subprocess.run(['ffmpeg', '-version'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        return FFmpegPipeWriter(path, fps, width, height)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        raise RuntimeError("FFmpeg is missing! Please install FFmpeg and add it to PATH.")
+
+
 def _read_video_frames(video_path):
     """
     Generator that yields frames from a video file.
@@ -162,8 +327,7 @@ def RIFE_interpolate(
     out_path = output if output else os.path.splitext(video)[0] + f"_interp.{ext}"
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    writer = cv2.VideoWriter(out_path, fourcc, fps, (width, height))
+    writer = create_video_writer(out_path, fps, width, height)
 
     # Padding
     tmp = max(32, int(32 / scale))
