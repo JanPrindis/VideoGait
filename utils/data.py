@@ -370,7 +370,7 @@ def find_matching_annotation(keypoint_json_path: str, annotations_root: str) -> 
 
     Args:
         keypoint_json_path (str): The full path to the keypoint JSON file.
-            Expected format: .../PROCESSED/{FPS}/KEYPOINTS/{file_name}.json
+            Expected format: .../PROCESSED/{detector}/{FPS}/KEYPOINTS/{file_name}.json
         annotations_root (str): The root directory where annotations are stored.
 
     Returns:
@@ -388,7 +388,7 @@ def find_matching_annotation(keypoint_json_path: str, annotations_root: str) -> 
         fps = parts[-3]
 
         # Sanity check if path is as expected
-        if parts[-2].upper() != 'KEYPOINTS' or parts[-4].upper() != 'PROCESSED':
+        if parts[-2].upper() != 'KEYPOINTS' or parts[-5].upper() != 'PROCESSED':
              log("DATA", f"Keypoint path '{keypoint_json_path}' does not seem to match the expected structure.", level="warning")
              return None
 

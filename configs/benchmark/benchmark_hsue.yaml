@@ -40,7 +40,7 @@ event_detector:
       foot_accel_filter_order: 2
 
 data:
-  dataset_root: "dataset/PROCESSED"
+  dataset_root: "dataset/PROCESSED/rtmlib"
   annotation_root: "annotations"
 
   # If true, the whole dataset is used, if false, only the validation part of the seed is used.
