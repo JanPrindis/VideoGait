@@ -3,6 +3,7 @@ import shutil
 import numpy as np
 from abc import ABC, abstractmethod
 
+from utils.config_models import AppConfig
 from utils.config_utils import resolve_skeleton_from_config
 from utils.data import get_valid_range, get_keypoints, cubic_interpolate_nan, butterworth_filter, average_with_nones
 
@@ -14,38 +15,38 @@ class BaseHeuristicDetector(ABC):
     It handles common tasks such as configuration loading, hip reference calculation,
     valid range detection, and data segmentation/preprocessing.
     """
-    def __init__(self, full_config):
+    def __init__(self, app_config: AppConfig):
         """
         Initializes the detector with the provided configuration.
 
         Args:
-            full_config (dict): The full application configuration dictionary.
+            app_config (AppConfig): The application configuration object.
         """
-        self.config = full_config
+        self.config = app_config
 
-        self.preprocessing_config = full_config.get("preprocessing", {})
-        self.heuristic_config = full_config.get("event_detector", {}).get("heuristic", {})
-        self.visualization_config = full_config.get("visualization", {})
+        self.preprocessing_config = self.config.preprocessing
+        self.heuristic_config = self.config.event_detector.heuristic
+        self.visualization_config = self.config.visualization
 
 
         # Algorithm specific parameters
-        self.algorithm_params = self.heuristic_config.get("params", {})
+        self.algorithm_params = self.heuristic_config.params
 
         # Pre-processing parameters
-        self.framerate = self.preprocessing_config.get("framerate", 60)
-        self.confidence_threshold = self.preprocessing_config.get("confidence_threshold", 0.4)
-        self.exclude_ratio = self.preprocessing_config.get("exclude_ratio", 0.05)
-        self.min_segment_length = self.preprocessing_config.get("min_segment_length", 60)
-        self.outlier_ratio = self.preprocessing_config.get("outlier_ratio", 0.2)
+        self.framerate = self.preprocessing_config.framerate
+        self.confidence_threshold = self.preprocessing_config.confidence_threshold
+        self.exclude_ratio = self.preprocessing_config.exclude_ratio
+        self.min_segment_length = self.preprocessing_config.min_segment_length
+        self.outlier_ratio = self.preprocessing_config.outlier_ratio
 
-        self.filter_cutoff = self.preprocessing_config.get("filter_cutoff", 6)
-        self.filter_order = self.preprocessing_config.get("filter_order", 4)
+        self.filter_cutoff = self.preprocessing_config.filter_cutoff
+        self.filter_order = self.preprocessing_config.filter_order
 
         # Visualization
-        self.save_debug_plot = self.visualization_config.get("event_detector_debug_plots", False)
+        self.save_debug_plot = self.visualization_config.event_detector_debug_plots
 
         try:
-            self.skeleton = resolve_skeleton_from_config(full_config)
+            self.skeleton = resolve_skeleton_from_config(app_config)
         except ValueError as e:
             raise ValueError(f"[Heuristic] Skeleton config error: {e}")
 

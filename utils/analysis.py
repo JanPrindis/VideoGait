@@ -11,9 +11,10 @@ import json
 from scipy.interpolate import interp1d
 from typing import Dict
 
+from utils.config_models import AppConfig
 from utils.json_serializer import KeypointSerializer
 from utils.preprocessing import preprocess_keypoints
-from utils.gait_structs import GaitEventType, PhaseType
+from utils.gait_structs import PhaseType
 from utils.config_utils import resolve_skeleton_from_config
 from utils.logger import log
 
@@ -22,21 +23,20 @@ class GaitAnalyzer:
     """
     Main class for performing gait analysis calculations.
     """
-    def __init__(self, app_config):
+    def __init__(self, app_config: AppConfig):
         """
         Initializes the analyzer with application configuration.
 
         Args:
-            app_config (dict): The application configuration dictionary containing
-                               preprocessing settings (filter parameters).
+            app_config (AppConfig): The application configuration object.
         """
         self.cfg = app_config
-        self.pre_cfg = app_config.get('preprocessing', {})
+        self.pre_cfg = app_config.preprocessing
         self.skeleton = resolve_skeleton_from_config(app_config)
 
         # Signal processing parameters
-        self.filter_cutoff = self.pre_cfg.get('filter_cutoff', 6)
-        self.filter_order = self.pre_cfg.get('filter_order', 4)
+        self.filter_cutoff = self.pre_cfg.filter_cutoff
+        self.filter_order = self.pre_cfg.filter_order
 
     def run_analysis(self, keypoints_path: str, events_data: Dict, gait_data: Dict, output_dir: str):
         """
@@ -803,13 +803,6 @@ class GaitAnalyzer:
 
         # Use Median to filter out outliers
         return float(np.median(all_lengths))
-
-    @staticmethod
-    def _extract_events_dict(events_data):
-        """Helper to safely extract the inner event dictionary."""
-        if isinstance(events_data, dict):
-            return events_data.get('events', events_data)
-        return {}
 
     @staticmethod
     def _aggregate_cycles(kinematics, l_phases, r_phases, valid_ranges):

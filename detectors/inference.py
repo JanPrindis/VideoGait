@@ -4,15 +4,16 @@ This module provides functionality for running pose estimation on video files.
 It handles configuration loading, path resolution, and execution of the configured pose detector.
 """
 import sys
-import yaml
 import argparse
 from pathlib import Path
+
+from utils.config_models import AppConfig
+from utils.config_utils import load_and_validate_yaml
 
 project_root = Path(__file__).resolve().parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-import detectors
 from detectors.builder import build_detector_from_file
 from utils.logger import log
 
@@ -38,7 +39,7 @@ def resolve_path(path_str: str, root: Path):
         return (root / p).resolve()
 
 
-def run_pose_extraction(app_config: dict, video_path: str, output_root: str = None, run_name: str = None):
+def run_pose_extraction(app_config: AppConfig, video_path: str, output_root: str = None, run_name: str = None):
     """
     Runs the pose extraction pipeline on a single video.
 
@@ -46,7 +47,7 @@ def run_pose_extraction(app_config: dict, video_path: str, output_root: str = No
     Results are saved to the configured output directory.
 
     Args:
-        app_config (dict): The application configuration dictionary.
+        app_config (AppConfig): The application configuration object.
         video_path (str): Path to the input video file.
         output_root (str, optional): Override for the output root directory.
         run_name (str, optional): Name for the output subdirectory (defaults to video filename).
@@ -69,7 +70,7 @@ def run_pose_extraction(app_config: dict, video_path: str, output_root: str = No
 
     # Otherwise use path from app config
     if not root_out_path:
-        cfg_out_str = app_config.get("output", {}).get("output_root_dir")
+        cfg_out_str = app_config.output.output_root_dir
         if cfg_out_str:
             root_out_path = resolve_path(cfg_out_str, project_root)
 
@@ -89,8 +90,8 @@ def run_pose_extraction(app_config: dict, video_path: str, output_root: str = No
         final_out_path.mkdir(parents=True, exist_ok=True)
 
     # Load detector config file
-    pose_det_section = app_config.get("pose_detector", {})
-    det_config_rel = pose_det_section.get("config_path")
+    pose_det_section = app_config.pose_detector
+    det_config_rel = pose_det_section.config_path
 
     if not det_config_rel:
         raise ValueError("App config missing 'pose_detector.config_path'")
@@ -127,7 +128,6 @@ if __name__ == "__main__":
         log("INFERENCE", f"Error: Config not found at {cfg_path}", level="error")
         sys.exit(1)
 
-    with open(cfg_path, 'r') as f:
-        loaded_config = yaml.safe_load(f)
+    app_config: AppConfig = load_and_validate_yaml(str(cfg_path), AppConfig)
 
-    run_pose_extraction(loaded_config, args.video, args.output)
+    run_pose_extraction(app_config, args.video, args.output)

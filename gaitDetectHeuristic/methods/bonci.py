@@ -39,18 +39,9 @@ class Bonci(BaseHeuristicDetector):
         # --- Zeni et al. wrapper ---
         # Get Zeni params from config file
         zeni_specific_params = self.algorithm_params.get("zeni_params", {})
-        zeni_config = copy.deepcopy(self.config)
+        zeni_config = self.config.model_copy(deep=True)
 
-        # Create fake
-        if "event_detector" in zeni_config and "heuristic" in zeni_config["event_detector"]:
-            zeni_config["event_detector"]["heuristic"]["params"] = zeni_specific_params
-        else:
-            # Fallback if using different config structure (should not really happen)
-            zeni_config["event_detector"] = {
-                "heuristic": {
-                    "params": zeni_specific_params
-                }
-            }
+        zeni_config.event_detector.heuristic.params = zeni_specific_params
 
         # Create detector instance
         base_detector = Zeni(zeni_config)

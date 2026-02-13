@@ -21,9 +21,10 @@ from gaitDetectNN.engine.trainer import Trainer
 from loaders import GaitDataset, collate_pad
 from utils.preprocessing import generate_features
 from utils.data import find_matching_annotation
-from skeletons import get_skeleton_by_name
 from train import build_scheduler
 from utils.logger import log
+from utils.config_models import TrainConfig
+from utils.config_utils import load_and_validate_yaml, build_preprocess_args_from_train_config
 
 
 # ==============================================================================
@@ -144,8 +145,8 @@ SEARCH_SPACES = {
 # OBJECTIVE FUNCTION
 # ==============================================================================
 
-def objective(trial, base_cfg, train_loader, val_loader, input_size, pos_weight, device, f1_window_frame):
-    model_type = base_cfg['model']['type']
+def objective(trial, base_cfg: TrainConfig, train_loader, val_loader, input_size, pos_weight, device, f1_window_frame):
+    model_type = base_cfg.model.type
 
     # Get tuning parameters
     if model_type not in SEARCH_SPACES:
@@ -157,22 +158,15 @@ def objective(trial, base_cfg, train_loader, val_loader, input_size, pos_weight,
     lr = suggested_params.pop("lr", 0.001)
     weight_decay = suggested_params.pop("weight_decay", 0.01)
 
+    current_cfg = base_cfg.model_copy(deep=True)
+    current_cfg.model.params.update(suggested_params)
+
+    if current_cfg.data.requires_adj_matrix:
+        current_cfg.model.params['features_config'] = current_cfg.data.features.model_dump()
+        current_cfg.model.params['skeleton_name'] = current_cfg.data.skeleton
+
     # Build Model
-    model_params = base_cfg['model'].get('params', {}).copy()
-    model_params.update(suggested_params)
-
-    # Modify training config for build_model
-    current_model_cfg = {
-        "type": model_type,
-        "params": model_params
-    }
-
-    # Keypoint data injection for adjacency matrix calculation
-    if base_cfg['data'].get('requires_adj_matrix', False):
-        current_model_cfg['params']['features_config'] = base_cfg['data']['features']
-        current_model_cfg['params']['skeleton_name'] = base_cfg['data']['skeleton']
-
-    model = build_model(current_model_cfg, input_size)
+    model = build_model(current_cfg.model, input_size)
 
     # Setup Training
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -184,13 +178,12 @@ def objective(trial, base_cfg, train_loader, val_loader, input_size, pos_weight,
     tuning_epochs = 15
 
     # Config hack
-    tune_training_cfg = base_cfg['training'].copy()
-    tune_training_cfg['learning_rate'] = lr
-    tune_training_cfg['epochs'] = tuning_epochs
+    current_cfg.training.learning_rate = lr
+    current_cfg.training.epochs = tuning_epochs
 
     scheduler = build_scheduler(
         optimizer,
-        tune_training_cfg,
+        current_cfg.training,
         steps_per_epoch=len(train_loader)
     )
 
@@ -232,25 +225,24 @@ def main():
     args = parser.parse_args()
 
     # Load training config
-    with open(args.config, 'r') as f:
-        cfg = yaml.safe_load(f)
+    cfg: TrainConfig = load_and_validate_yaml(args.config, TrainConfig)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    log("TUNE", f"Tuning: {cfg['model']['type']} | Device: {device}", level="info")
+    log("TUNE", f"Tuning: {cfg.model.type} | Device: {device}", level="info")
 
     # --------------------------------------------------------------------------
     # DATASET
     # --------------------------------------------------------------------------
-    dataset_root = os.path.join(PROJECT_ROOT, cfg['data']['dataset_root'])
-    annotation_root = os.path.join(PROJECT_ROOT, cfg['data'].get('annotation_root', 'annotations'))
-    framerate = cfg['data']['framerate']
+    dataset_root = os.path.join(PROJECT_ROOT, cfg.data.dataset_root)
+    annotation_root = os.path.join(PROJECT_ROOT, cfg.data.annotation_root)
+    framerate = cfg.data.framerate
 
     # F1 Tolerance Window
-    tolerance_ms = cfg['training'].get('f1_window_size_ms', 50)
+    tolerance_ms = cfg.training.f1_window_size_ms
     tolerance_frames = int(round((tolerance_ms / 1000.0) * framerate))
 
     # Find files
-    search_pattern = os.path.join(dataset_root, str(framerate), "KEYPOINTS", "*.json")
+    search_pattern = os.path.join(dataset_root, str(int(framerate)), "KEYPOINTS", "*.json")
     keypoint_files = glob(search_pattern, recursive=True)
 
     file_paths = []
@@ -260,28 +252,14 @@ def main():
             file_paths.append((kp_path, ann_path))
 
     # Shuffle & Split
-    random.seed(cfg['training'].get('seed', 3))
+    random.seed(cfg.training.seed)
     random.shuffle(file_paths)
-    split_idx = int(len(file_paths) * cfg['data'].get('train_split', 0.8))
+    split_idx = int(len(file_paths) * cfg.data.train_split)
     train_paths = file_paths[:split_idx]
     val_paths = file_paths[split_idx:]
 
     # Preprocessing Config
-    skeleton_def = get_skeleton_by_name(cfg['data']['skeleton'])
-    features_cfg = cfg['data'].get('features', {})
-    preprocess_args = {
-        "skeleton_definition": skeleton_def,
-        "confidence_threshold": cfg['preprocessing'].get('confidence_threshold', 0.4),
-        "exclude_ratio": cfg['preprocessing'].get('exclude_ratio', 0.1),
-        "min_segment_length": cfg['preprocessing'].get('min_segment_length', 60),
-        "outlier_ratio": cfg['preprocessing'].get('outlier_ratio', 0.2),
-        "filter_cutoff": cfg['preprocessing'].get('filter_cutoff', 6),
-        "filter_order": cfg['preprocessing'].get('filter_order', 4),
-        "keypoints": features_cfg.get('keypoints'),
-        "kinematics_keypoints": features_cfg.get('kinematics'),
-        "angle_triplets": features_cfg.get('angles'),
-        "distance_pairs": features_cfg.get('distances'),
-    }
+    preprocess_args = build_preprocess_args_from_train_config(cfg)
 
     log("TUNE", "Loading datasets...", level="info")
     train_dataset = GaitDataset(train_paths, preprocessing_fn=generate_features, **preprocess_args)
@@ -291,7 +269,7 @@ def main():
         raise RuntimeError("Train dataset empty!")
 
     # DataLoaders
-    batch_size = cfg['training']['batch_size']
+    batch_size = cfg.training.batch_size
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_pad, num_workers=0,
                               pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, collate_fn=collate_pad, num_workers=0, pin_memory=True)

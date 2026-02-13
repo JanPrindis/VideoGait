@@ -1,3 +1,15 @@
+"""
+Benchmark Runner for Gait Event Detection.
+
+This script executes a benchmark for gait event detection methods (NeuralNet or Heuristic)
+based on a provided configuration file. It processes a set of test files, compares
+predicted events against ground truth annotations, calculates reliability metrics
+(Precision, Recall, F1), and generates visualization plots for error distribution.
+
+Usage:
+    python run_benchmark.py --config <path_to_config_yaml> [--debug]
+"""
+
 import argparse
 import os
 import sys
@@ -16,12 +28,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import seaborn as sns
-import yaml
-from tqdm import tqdm
 
 from utils.json_serializer import AnnotationSerializer
 from utils.gait_structs import GaitEventType
 from utils.logger import log
+from utils.config_models import BenchmarkConfig
+from utils.config_utils import load_and_validate_yaml
 
 from benchmark.utils.data_manager import get_benchmark_files
 from benchmark.engine.matcher import match_events_greedy
@@ -31,6 +43,12 @@ from benchmark.wrappers.heuristic_wrapper import HeuristicWrapper
 
 # --- PLOTTING STYLE CONFIGURATION ---
 def set_publication_style():
+    """
+    Configures Matplotlib plotting style for publication-quality figures.
+
+    Sets the style to 'seaborn-v0_8-whitegrid' and updates rcParams for font sizes,
+    DPI, line widths, and axis labels to ensure readability in papers/reports.
+    """
     plt.style.use('seaborn-v0_8-whitegrid')
     plt.rcParams.update({
         'figure.dpi': 300,
@@ -49,6 +67,9 @@ def set_publication_style():
 
 
 def run_benchmark():
+    """
+    Main execution function for the benchmark.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, required=True)
     parser.add_argument("--debug", action='store_true', help="Enable verbose output for the first file")
@@ -56,21 +77,24 @@ def run_benchmark():
 
     # Load Config
     log("BENCHMARK", f"Loading Config: {args.config}", level="info")
-    with open(os.path.join(PROJECT_ROOT, args.config)) as f:
-        cfg = yaml.safe_load(f)
+    try:
+        cfg: BenchmarkConfig = load_and_validate_yaml(os.path.join(PROJECT_ROOT, args.config), BenchmarkConfig)
+    except ValueError as e:
+        log("CONFIG", str(e), level="error")
+        return None
 
-    experiment_name = cfg.get('experiment_name', 'Benchmark')
+    experiment_name = cfg.experiment_name
 
     # Get Data (Files + resolved FPS)
     test_files, global_fps = get_benchmark_files(cfg)
 
     # Setup Wrapper
-    method = cfg['event_detector']['method']
+    method = cfg.event_detector.method
     if method == "NeuralNet":
-        wrapper = NeuralNetWrapper(cfg['preprocessing'], cfg['event_detector']['neural_net'])
+        wrapper = NeuralNetWrapper(cfg.preprocessing, cfg.event_detector.neural_net)
 
     elif method == "Heuristic":
-        wrapper = HeuristicWrapper(cfg['preprocessing'], cfg['event_detector']['heuristic'])
+        wrapper = HeuristicWrapper(cfg.preprocessing, cfg.event_detector.heuristic)
 
     else:
         raise ValueError(f"Unknown method: {method}")
@@ -78,8 +102,8 @@ def run_benchmark():
     # Dual tolerance
     # Detections under loose tolerance are shown in the barplots and histograms
     # Detections under strict tolerance are used to calculate F1 score and associated metrics
-    strict_tolerance_ms = cfg['evaluation'].get('strict_tolerance_ms', 50)
-    loose_tolerance_ms = cfg['evaluation'].get('loose_tolerance_ms', 150)
+    strict_tolerance_ms = cfg.evaluation.strict_tolerance_ms
+    loose_tolerance_ms = cfg.evaluation.loose_tolerance_ms
 
     log("BENCHMARK", f"Starting Benchmark: {experiment_name}", level="info")
     log("BENCHMARK", f"Loose Tolerance (Graphs): {loose_tolerance_ms} ms", level="info")
@@ -97,7 +121,7 @@ def run_benchmark():
 
     debug_active = args.debug
 
-    for i, item in enumerate(tqdm(test_files, desc="Benchmarking")):
+    for i, item in enumerate(test_files):
 
         # Predict
         pred_result = wrapper.predict(item['kp'])
@@ -158,7 +182,7 @@ def run_benchmark():
             debug_active = False
 
     log("BENCHMARK", "Processing Results & Generating Plots", level="info")
-    out_dir = os.path.join(PROJECT_ROOT, cfg['output_dir'])
+    out_dir = os.path.join(PROJECT_ROOT, cfg.output_dir)
     os.makedirs(out_dir, exist_ok=True)
     set_publication_style()
 
@@ -166,7 +190,7 @@ def run_benchmark():
     df_raw = pd.DataFrame(raw_matches)  # Toto obsahuje LOOSE matches
     if df_raw.empty:
         log("BENCHMARK", "No matches found! Check tolerance or data.", level="error")
-        return
+        return None
 
     # Save Loose Matches
     df_raw.to_csv(os.path.join(out_dir, "raw_matches_loose.csv"), index=False)

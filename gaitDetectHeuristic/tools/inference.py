@@ -1,7 +1,7 @@
 import sys
 import os
-import yaml
-from typing import Union, Dict, Any
+
+from utils.config_models import AppConfig
 
 # --- PATH SETUP ---
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,7 +15,7 @@ from utils.logger import log
 
 
 def run_heuristic_inference(
-        app_config: Union[str, Dict[str, Any]],
+        app_config: AppConfig,
         input_path: str,
         output_dir: str = None
 ):
@@ -23,7 +23,7 @@ def run_heuristic_inference(
     Executes the heuristic gait analysis inference pipeline.
 
     Args:
-        app_config (Union[str, Dict[str, Any]]): Path to the app config YAML or the loaded dict.
+        app_config (AppConfig): The application configuration object.
         input_path (str): Path to the input keypoints JSON file.
         output_dir (str, optional): Directory to save output plots. Defaults to None.
 
@@ -34,17 +34,6 @@ def run_heuristic_inference(
             - "global_ranges": List of valid frame ranges processed.
             - "predictions": None (Heuristics do not output continuous probabilities).
     """
-    # Load Config
-    if isinstance(app_config, str):
-        if not os.path.isabs(app_config):
-            app_config = os.path.join(PROJECT_ROOT, app_config)
-
-        log("INFERENCE", f"Loading App Config from: {app_config}", level="info")
-        with open(app_config, 'r') as f:
-            cfg = yaml.safe_load(f)
-    else:
-        cfg = app_config
-
     if not os.path.isabs(input_path):
         input_path = os.path.join(PROJECT_ROOT, input_path)
 
@@ -52,13 +41,13 @@ def run_heuristic_inference(
         output_dir = os.path.join(PROJECT_ROOT, output_dir)
 
     # Safety Check
-    method = cfg.get('event_detector', {}).get('method')
+    method = app_config.event_detector.method
     if method != 'Heuristic':
         log("INFERENCE", f"Config specifies method '{method}', but this is the Heuristic pipeline. Proceeding anyway.", level="warning")
 
     # Build Detector using the Builder Pattern
     try:
-        detector = build_heuristic_detector(cfg)
+        detector = build_heuristic_detector(app_config)
         log("INFERENCE", f"Initialized Heuristic Detector: {detector.__class__.__name__}", level="info")
     except Exception as e:
         log("INFERENCE", f"Failed to initialize detector: {e}", level="error")
@@ -87,29 +76,3 @@ def run_heuristic_inference(
         "global_ranges": ranges
 
     }
-
-
-if __name__ == "__main__":
-    methods = ["bonci", "desailly", "ghoussayni", "hreljac", "hsue", "oconnor", "zeni"]
-    visualize = False
-
-    for method in methods:
-        config = f"configs/apps/analyze_video_{method}.yaml"
-
-        input_path = "dataset/PROCESSED/60/KEYPOINTS/KOA_003_SV.json"
-        output_dir = f"results/test_patient_{method}"
-
-        data = run_heuristic_inference(config, input_path, output_dir)
-        log("INFERENCE", f"Testing done: {method}", level="success")
-
-        if visualize:
-            from utils.gait_structs import build_phases_from_events
-            from tools.debug_viz import visualize_gait_phases, print_statistics
-
-            l_phases, r_phases, support_phases = build_phases_from_events(
-                data["events"],
-                data["global_ranges"]
-            )
-
-            print_statistics(l_phases, r_phases, support_phases)
-            visualize_gait_phases(l_phases, r_phases, support_phases)

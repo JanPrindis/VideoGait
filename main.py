@@ -11,8 +11,9 @@ This script orchestrates the entire workflow:
 """
 import os
 import sys
-import yaml
 from pathlib import Path
+
+from utils.config_models import AppConfig, TrainConfig
 from utils.logger import log
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -33,13 +34,7 @@ from utils.visualizer import GaitVisualizer
 from utils.analysis import GaitAnalyzer
 from utils.plotting import GaitPlotter
 from utils.report_generator import ReportGenerator
-from utils.config_utils import resolve_skeleton_name_from_config
-
-
-def load_yaml(path):
-    """Helper to load a YAML file."""
-    with open(path, 'r') as f:
-        return yaml.safe_load(f)
+from utils.config_utils import resolve_skeleton_name_from_config, load_and_validate_yaml
 
 
 def run_analysis_pipeline(
@@ -74,11 +69,15 @@ def run_analysis_pipeline(
         log("PIPELINE", f"Config not found at {app_config_path}", level="error")
         return None
 
-    app_config = load_yaml(app_config_path)
+    try:
+        app_config: AppConfig = load_and_validate_yaml(app_config_path, AppConfig)
+    except ValueError as e:
+        log("CONFIG", str(e), level="error")
+        return None
 
     # --- OUTPUT DIRECTORY SETUP ---
     # Get output root folder
-    res_root = output_root_override or app_config.get('output', {}).get('output_root_dir', 'results')
+    res_root = output_root_override or app_config.output.output_root_dir
 
     # Get analysis folder name
     if analysis_name_override:
@@ -93,8 +92,8 @@ def run_analysis_pipeline(
     log("PIPELINE", f"Output Directory: {output_dir}", level="info")
 
     # --- TARGET FPS RESOLUTION AND USED SKELETONS ---
-    detector_cfg = app_config.get('event_detector', {})
-    method = detector_cfg.get('method', 'Heuristic')
+    detector_cfg = app_config.event_detector
+    method = detector_cfg.method
 
     # Check what skeleton is used by the detector
     try:
@@ -104,18 +103,23 @@ def run_analysis_pipeline(
         return None
 
     if method == 'Heuristic':
-        target_fps = app_config.get('preprocessing', {}).get('framerate', 60)
+        target_fps = app_config.preprocessing.framerate
         log("CONFIG", f"Method: Heuristic -> Using AppConfig framerate: {target_fps}", level="info")
         log("PIPELINE", f"Heuristics will use skeleton: {produced_skeleton_name}", level="info")
 
     elif method == 'NeuralNet':
-        exp_path = detector_cfg.get('neural_net', {}).get('experiment_path', '')
+        exp_path = detector_cfg.neural_net.experiment_path
         nn_config_path = os.path.join(exp_path, 'config.yaml')
 
         if os.path.exists(nn_config_path):
-            nn_config = load_yaml(nn_config_path)
-            target_fps = nn_config.get('data', {}).get('framerate', 60)
-            expected_skeleton_name = nn_config.get('data', {}).get('skeleton')
+            try:
+                nn_config: TrainConfig = load_and_validate_yaml(nn_config_path, TrainConfig)
+            except ValueError as e:
+                log("CONFIG", str(e), level="error")
+                return None
+
+            target_fps = nn_config.data.framerate
+            expected_skeleton_name = nn_config.data.skeleton
 
             log("CONFIG", f"Method: NeuralNet -> Loaded from {nn_config_path}", level="info")
             log("CONFIG", f"Target FPS: {target_fps}", level="info")

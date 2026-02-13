@@ -5,10 +5,13 @@ It leverages the model registry to dynamically instantiate classes based on stri
 defined in the configuration.
 """
 import torch
+
+from utils.config_models import ModelDefinition
 from utils.registry import MODELS
 import gaitDetectNN.models
 
-def build_model(cfg, input_size):
+
+def build_model(cfg: ModelDefinition, input_size: int):
     """
     Instantiates a model from the registry based on the provided configuration.
 
@@ -21,9 +24,11 @@ def build_model(cfg, input_size):
     Returns:
         torch.nn.Module: The initialized model instance.
     """
-    model_type = cfg["type"]
-    model_params = cfg.get('params', {})
+    model_type = cfg.type
+    model_params = cfg.params
     model_class = MODELS.get(model_type)
-    model = model_class(input_size=input_size, **model_params)
+    if not model_class:
+        raise ValueError(f"Model '{model_type}' not found in registry!")
 
+    model = model_class(input_size=input_size, **model_params)
     return model

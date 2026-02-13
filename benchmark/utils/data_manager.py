@@ -6,9 +6,13 @@ consistent with how the model was trained, or on the full dataset if requested.
 """
 import os
 import sys
-import yaml
+from typing import Any
+
 import random
 from glob import glob
+
+from utils.config_models import BenchmarkConfig, TrainConfig
+from utils.config_utils import load_and_validate_yaml
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 if PROJECT_ROOT not in sys.path:
@@ -18,7 +22,7 @@ from utils.data import find_matching_annotation
 from utils.logger import log
 
 
-def get_data_settings(cfg):
+def get_data_settings(cfg: BenchmarkConfig):
     """
     Resolves data configuration parameters based on the detection method.
 
@@ -27,7 +31,7 @@ def get_data_settings(cfg):
     If 'Heuristic', it uses parameters directly from the benchmark config.
 
     Args:
-        cfg (dict): The benchmark configuration dictionary.
+        cfg (BenchmarkConfig): The benchmark configuration object.
 
     Returns:
         dict: A dictionary containing:
@@ -38,45 +42,45 @@ def get_data_settings(cfg):
             - seed (int): Random seed for splitting.
             - split_ratio (float): The train/val split ratio used.
     """
-    method = cfg['event_detector']['method']
-    data_root = os.path.join(PROJECT_ROOT, cfg['data']['dataset_root'])
+    method = cfg.event_detector.method
+    data_root = os.path.join(PROJECT_ROOT, cfg.data.dataset_root)
 
-    settings = {
+    settings: dict[str, Any] = {
         "dataset_root": data_root,
-        "annotation_root": os.path.join(PROJECT_ROOT, cfg['data']['annotation_root']),
-        "use_full": cfg['data'].get('use_full_dataset', False)
+        "annotation_root": os.path.join(PROJECT_ROOT, cfg.data.annotation_root),
+        "use_full": cfg.data.use_full_dataset
     }
 
     # For NN, pull the config from training config, so it matches what the model expects
     if method == "NeuralNet":
-        nn_cfg = cfg['event_detector']['neural_net']
-        exp_path = os.path.join(PROJECT_ROOT, nn_cfg['experiment_path'])
+        nn_cfg = cfg.event_detector.neural_net
+        exp_path = os.path.join(PROJECT_ROOT, nn_cfg.experiment_path)
         train_cfg_path = os.path.join(exp_path, "config.yaml")
 
         if not os.path.exists(train_cfg_path):
             raise FileNotFoundError(f"Training config missing for NeuralNet: {train_cfg_path}")
 
-        log("DATA", f"Auto-resolving data settings from experiment: {nn_cfg['experiment_path']}", level="info")
-        with open(train_cfg_path) as f:
-            train_cfg = yaml.safe_load(f)
+        log("DATA", f"Auto-resolving data settings from experiment: {nn_cfg.experiment_path}", level="info")
 
-        settings["framerate"] = train_cfg['data']['framerate']
-        settings["seed"] = train_cfg['training']['seed']
-        settings["split_ratio"] = train_cfg['data'].get('train_split', 0.8)
+        train_cfg: TrainConfig = load_and_validate_yaml(train_cfg_path, TrainConfig)
+
+        settings["framerate"] = train_cfg.data.framerate
+        settings["seed"] = train_cfg.training.seed
+        settings["split_ratio"] = train_cfg.data.train_split
 
     # For heuristic methods, pull the config from the config file
     elif method == "Heuristic":
-        heuristics_cfg = cfg['event_detector']['heuristic']
+        heuristics_cfg = cfg.event_detector.heuristic
         log("DATA", "Using explicit settings from Heuristic config.", level="info")
 
-        settings["framerate"] = cfg['preprocessing']['framerate']
-        settings["seed"] = heuristics_cfg['seed']
-        settings["split_ratio"] = heuristics_cfg['train_split']
+        settings["framerate"] = cfg.preprocessing.framerate
+        settings["seed"] = heuristics_cfg.seed
+        settings["split_ratio"] = heuristics_cfg.train_split
 
     return settings
 
 
-def get_benchmark_files(cfg):
+def get_benchmark_files(cfg: BenchmarkConfig):
     """
     Retrieves the list of file pairs (keypoints + annotations) for benchmarking.
 
@@ -85,7 +89,7 @@ def get_benchmark_files(cfg):
     unless 'use_full_dataset' is enabled.
 
     Args:
-        cfg (dict): The benchmark configuration dictionary.
+        cfg (BenchmarkConfig): The benchmark configuration object.
 
     Returns:
         tuple: A tuple containing:
@@ -98,7 +102,7 @@ def get_benchmark_files(cfg):
     # Find files based on FPS
     # The expected file structure is DATASET_ROOT/{FPS}/KEYPOINTS/file.json
     fps = settings["framerate"]
-    search_pattern = os.path.join(settings["dataset_root"], str(fps), "KEYPOINTS", "*.json")
+    search_pattern = os.path.join(settings["dataset_root"], str(int(fps)), "KEYPOINTS", "*.json")
 
     log("DATA", f"Searching: {search_pattern}", level="info")
     files = glob(search_pattern, recursive=True)

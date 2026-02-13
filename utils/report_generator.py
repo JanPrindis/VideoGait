@@ -10,10 +10,11 @@ import datetime
 import pathlib
 import sys
 
-import yaml
-
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from weasyprint import HTML
+
+from utils.config_models import AppConfig, DetectorConfig, TrainConfig
+from utils.config_utils import load_and_validate_yaml
 from utils.logger import log
 
 project_root = pathlib.Path(__file__).resolve().parent.parent
@@ -25,12 +26,12 @@ class ReportGenerator:
     """
     Generates reports (HTML, PDF, Interactive) from gait analysis data.
     """
-    def __init__(self, app_config: dict, output_dir: str, template_dir: str = "./templates"):
+    def __init__(self, app_config: AppConfig, output_dir: str, template_dir: str = "./templates"):
         """
         Initializes the report generator.
 
         Args:
-            app_config (dict): Application configuration dictionary.
+            app_config (AppConfig): The application configuration object.
             output_dir (str): Directory where reports will be saved.
             template_dir (str, optional): Directory containing Jinja2 templates. Defaults to "./templates".
         """
@@ -50,18 +51,6 @@ class ReportGenerator:
 
         self.analysis_config_meta = self._extract_config_metadata()
 
-    @staticmethod
-    def _load_yaml(rel_path):
-        """Helper to safely load a YAML file relative to the project root."""
-        try:
-            full_path = project_root / rel_path
-            if full_path.exists():
-                with open(full_path, 'r', encoding='utf-8') as f:
-                    return yaml.safe_load(f)
-        except Exception as e:
-            log("REPORT", f"Failed to load config at {rel_path}: {e}", level="warning")
-        return {}
-
     def _extract_config_metadata(self):
         """
         Extracts metadata about the models used (Pose Detector, Event Detector)
@@ -74,37 +63,41 @@ class ReportGenerator:
         }
 
         # POSE DETECTOR
-        pose_cfg = self.app_config.get("pose_detector", {})
-        config_path = pose_cfg.get("config_path")
+        config_path = self.app_config.pose_detector.config_path
         if config_path:
             # Load pose detector config
-            sub_config = self._load_yaml(config_path)
-            model_type = sub_config.get("type", "Unknown")
-            model_name = sub_config.get("model_name", "")
+            try:
+                det_config: DetectorConfig = load_and_validate_yaml(config_path, DetectorConfig)
+            except ValueError as e:
+                log("CONFIG", str(e), level="error")
+                return None
 
-            if model_name:
-                meta["pose_model"] = f"{model_type} ({model_name})"
-            else:
-                meta["pose_model"] = model_type
+            model_type = det_config.type
+            meta["pose_model"] = model_type
 
         # EVENT DETECTOR
-        event_cfg = self.app_config.get("event_detector", {})
-        method = event_cfg.get("method", "Unknown")
+        event_cfg = self.app_config.event_detector
+        method = event_cfg.method
         meta["event_method"] = method
 
         if method == "Heuristic":
             # Heuristic -> method
-            meta["event_model_details"] = event_cfg.get("heuristic", {}).get("method", "Default")
+            meta["event_model_details"] = event_cfg.heuristic.method
 
         elif method == "NeuralNet":
             # NeuralNet -> experiment_path -> config.yaml -> model.type
-            nn_cfg = event_cfg.get("neural_net", {})
-            exp_path = nn_cfg.get("experiment_path")
+            exp_path = event_cfg.neural_net.experiment_path
             if exp_path:
-                # Load trining config
                 train_config_path = os.path.join(exp_path, "config.yaml")
-                train_config = self._load_yaml(train_config_path)
-                meta["event_model_details"] = train_config.get("model", {}).get("type", "Unknown NN Model")
+
+                # Load training config
+                try:
+                    train_config: TrainConfig = load_and_validate_yaml(train_config_path, TrainConfig)
+                except ValueError as e:
+                    log("CONFIG", str(e), level="error")
+                    return None
+
+                meta["event_model_details"] = train_config.model.type
 
         return meta
 

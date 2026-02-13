@@ -11,6 +11,7 @@ from typing import List, Tuple, Dict, Optional, Union
 
 from tqdm import tqdm
 
+from utils.config_models import AppConfig
 from skeletons.skeletons import SkeletonSide
 from utils.config_utils import resolve_skeleton_from_config
 from utils.gait_structs import PhaseType, GaitEventType
@@ -20,25 +21,22 @@ from utils.video_processing import create_video_writer
 
 
 class GaitVisualizer:
-    def __init__(self, app_config):
+    def __init__(self, app_config: AppConfig):
         """
         Initializes the visualizer with application configuration.
 
         Args:
-            app_config (dict): The application configuration dictionary containing
-                               visualization settings (colors, thickness, toggles).
+            app_config (AppConfig): The application configuration object.
         """
-        self.cfg = app_config
+        self.app_config = app_config
+        self.skel = resolve_skeleton_from_config(app_config)
 
-        skel_name = resolve_skeleton_from_config(app_config)
-        self.skel = skel_name
-
-        viz_cfg = self.cfg.get('visualization', {})
-        colors_cfg = viz_cfg.get('colors', {})
-        preprocess_cfg = self.cfg.get('preprocessing', {})
+        viz_cfg = self.app_config.visualization
+        colors_cfg = viz_cfg.colors
+        preprocess_cfg = self.app_config.preprocessing
 
         # Visualization confidence
-        self.min_viz_conf = preprocess_cfg.get('confidence_threshold', 0.0)
+        self.min_viz_conf = preprocess_cfg.confidence_threshold
 
         # Load colors (RGB/HEX -> BGR)
         self.colors = {
@@ -59,16 +57,16 @@ class GaitVisualizer:
         self.com_col = self._parse_color(colors_cfg.get('com_line', [255, 0, 255]))
 
         # Draw settings
-        self.thickness = viz_cfg.get('line_thickness', 2)
-        self.radius = viz_cfg.get('keypoint_radius', 4)
-        self.fp_duration = viz_cfg.get('footprint_duration', 30)
-        self.trail_thickness = viz_cfg.get('trail_thickness', 2)
+        self.thickness = viz_cfg.line_thickness
+        self.radius = viz_cfg.keypoint_radius
+        self.fp_duration = viz_cfg.footprint_duration
+        self.trail_thickness = viz_cfg.trail_thickness
 
         # Output toggles
-        outputs = viz_cfg.get('outputs', {})
-        self.do_overlay = outputs.get('enable_overlay', True)
-        self.do_kinematics = outputs.get('enable_kinematics', False)
-        self.do_logic = outputs.get('enable_logic', False)
+        outputs = viz_cfg.outputs
+        self.do_overlay = outputs.enable_overlay
+        self.do_kinematics = outputs.enable_kinematics
+        self.do_logic = outputs.enable_logic
 
         # Dynamic keypoint mapping
         self.kps_map = {
