@@ -23,31 +23,66 @@ with warnings.catch_warnings():
 
 # Video reader replacement
 def _read_video_frames(video_path):
+    """
+    Generator that yields frames from a video file.
+
+    Args:
+        video_path (str): Path to the video file.
+
+    Yields:
+        np.ndarray: Video frame in RGB format.
+    """
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise IOError(f"Cannot open video file: {video_path}")
+
     while True:
         ret, frame = cap.read()
         if not ret:
             break
         yield cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
     cap.release()
 
 
-# Padding helper
 def _pad_image(img, padding, fp16=False):
+    """
+    Pads the image tensor.
+
+    Args:
+        img (torch.Tensor): Input image tensor.
+        padding (tuple): Padding values (left, right, top, bottom).
+        fp16 (bool): Whether to convert to half precision.
+
+    Returns:
+        torch.Tensor: Padded image tensor.
+    """
     img = F.pad(img, padding)
     return img.half() if fp16 else img
 
 
-# Frame interpolation
 def _make_inference(model, I0, I1, n, scale):
+    """
+    Recursively interpolates frames between I0 and I1.
+
+    Args:
+        model: RIFE model instance.
+        I0 (torch.Tensor): Start frame.
+        I1 (torch.Tensor): End frame.
+        n (int): Number of intermediate frames to generate.
+        scale (float): Scaling factor.
+
+    Returns:
+        list[torch.Tensor]: List of interpolated frames.
+    """
     if n == 1:
         mid = model.inference(I0, I1, scale)
         return [mid]
+
     middle = model.inference(I0, I1, scale)
     first_half = _make_inference(model, I0, middle, n=n // 2, scale=scale)
     second_half = _make_inference(model, middle, I1, n=n // 2, scale=scale)
+
     if n % 2:
         return [*first_half, middle, *second_half]
     else:
@@ -64,24 +99,16 @@ def RIFE_interpolate(
     ext: str = "mp4"
 ):
     """
-    Video interpolation using RIFE HDv3
+    Video interpolation using RIFE HDv3.
 
-    Parameters
-    ----------
-    video : str
-        Path to input video
-    output : str, optional
-        Output file path, default: None (auto based on input)
-    exp : int, optional
-        Interpolation exponent, default: 1
-    fps : float, optional
-        Override output FPS, default: None
-    scale : float, optional
-        Image scaling factor, default: 1.0
-    fp16 : bool, optional
-        Enable FP16 inference, default: False
-    ext : str, optional
-        Output file extension, default: "mp4"
+    Args:
+        video (str): Path to input video.
+        output (str, optional): Output file path. Defaults to None (auto based on input).
+        exp (int, optional): Interpolation exponent (2^exp frames). Defaults to 1.
+        fps (float, optional): Override output FPS. Defaults to None.
+        scale (float, optional): Image scaling factor. Defaults to 1.0.
+        fp16 (bool, optional): Enable FP16 inference. Defaults to False.
+        ext (str, optional): Output file extension. Defaults to "mp4".
     """
 
     # If output isn't provided, derive from input
@@ -194,6 +221,15 @@ def interpolate_minterpolate(input_video, output_video, target_fps=120):
 
 
 def get_video_fps(video_path):
+    """
+    Retrieves the framerate of a video file.
+
+    Args:
+        video_path (str): Path to the video file.
+
+    Returns:
+        float: The framerate (FPS).
+    """
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise IOError(f"Cannot open video: {video_path}")
@@ -203,6 +239,17 @@ def get_video_fps(video_path):
 
 
 def smart_interpolate(input_path, output_path, target_fps):
+    """
+    Intelligently interpolates a video to a target FPS using a hybrid strategy.
+
+    It attempts to use RIFE (Deep Learning) for 2^n interpolation factors where possible,
+    and falls back to FFmpeg's minterpolate for other ratios or as a pre-step.
+
+    Args:
+        input_path (str): Path to input video.
+        output_path (str): Path to output video.
+        target_fps (float): Desired output framerate.
+    """
     orig_fps = get_video_fps(input_path)
 
     # Float error tolerance
