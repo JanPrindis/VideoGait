@@ -71,10 +71,9 @@ class RTMLib(BaseDetector):
 
     def detect(self, video_path, output_path):
         v_path = Path(video_path).resolve()
-        root_out_path = Path(output_path).resolve()
+        save_dir = Path(output_path).resolve()
 
         # Create output directory
-        save_dir = root_out_path / "pose_detector_data"
         save_dir.mkdir(parents=True, exist_ok=True)
 
         # Get output filename: video.mp4 -> video.json
