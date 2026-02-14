@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 
 from utils.config_models import AppConfig, TrainConfig
-from utils.config_utils import load_and_validate_yaml, build_preprocess_args_from_train_config
+from utils.config_utils import load_and_validate_yaml, build_preprocess_args_from_train_config, \
+    resolve_skeleton_from_config
 
 # --- PATH SETUP ---
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -291,6 +292,13 @@ def run_nn_inference(
 
     # Sync features
     preprocess_args = build_preprocess_args_from_train_config(train_cfg)
+
+    # Override the skeleton with detector's skeleton to allow cross skeleton detection
+    # This ensures we parse the keypoint JSON using the indices of the actual detector
+    # Missing features will be zero-padded
+    detector_skeleton = resolve_skeleton_from_config(app_config)
+    preprocess_args["skeleton_definition"] = detector_skeleton
+
     preprocess_args["confidence_threshold"] = app_config.preprocessing.confidence_threshold
     preprocess_args["exclude_ratio"] = app_config.preprocessing.exclude_ratio
 

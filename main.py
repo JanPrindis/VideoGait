@@ -127,12 +127,10 @@ def run_analysis_pipeline(
             # Skeleton handshake check
             if expected_skeleton_name.upper() != produced_skeleton_name:
                 log("PIPELINE",
-                    f"SKELETON MISMATCH ERROR! Detector uses '{produced_skeleton_name}', but NeuralNet expects '{expected_skeleton_name.upper()}'!",
-                    level="error")
-                return None
-            else:
-                log("PIPELINE", f"Skeleton Handshake OK: {produced_skeleton_name}", level="info")
-
+                    f"SKELETON MISMATCH WARNING! Detector uses '{produced_skeleton_name}', but NeuralNet expects '{expected_skeleton_name.upper()}'!",
+                    level="warning")
+                log("PIPELINE", "Proceeding with Cross-Skeleton Inference. Missing keypoints will be zero-padded.",
+                    level="warning")
         else:
             log("CONFIG", f"ERROR: Neural Net config not found at {nn_config_path}", level="error")
             return None
