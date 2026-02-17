@@ -233,6 +233,7 @@
             min-height: 220px;
             height: 475px;
             max-height: 80vh;
+            box-sizing: border-box;
             display: flex;
             flex-direction: column;
         }
@@ -1091,7 +1092,7 @@
 
         // Calculate target height + overhead (controls, padding)
         const targetVidHeight = vidWidth / aspect;
-        const overhead = panel.clientHeight - row.clientHeight;
+        const overhead = panel.offsetHeight - row.clientHeight;
         const newHeight = targetVidHeight + overhead;
 
         // Apply new height
