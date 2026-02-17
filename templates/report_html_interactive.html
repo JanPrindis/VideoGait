@@ -229,7 +229,6 @@
             border-bottom: 1px solid #ddd;
             padding: 15px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-            resize: vertical;
             overflow: hidden;
             min-height: 220px;
             height: 475px;
@@ -303,6 +302,24 @@
             background: var(--accent);
         }
 
+        /* --- RESIZE HANDLE --- */
+        .resize-handle {
+            height: 12px;
+            background-color: #e0e0e0;
+            cursor: row-resize;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-top: 1px solid #ccc;
+            margin: 10px -15px -15px -15px;
+            flex-shrink: 0;
+        }
+        .resize-handle:hover { background-color: #d0d0d0; }
+        .resize-handle::before {
+            content: ""; display: block; width: 40px; height: 3px;
+            border-top: 2px solid #999; border-bottom: 2px solid #999;
+        }
+
         /* --- PLOTLY CONTAINERS --- */
         .plot-container {
             width: 100%;
@@ -369,6 +386,7 @@
             <span id="frame-display" style="font-family: monospace; font-weight: bold; width: 80px; text-align: right;">Fr: 0</span>
             <span style="color:#ccc; font-size:1.2rem;">↨</span>
         </div>
+        <div class="resize-handle" id="resize-handle" title="Drag to resize"></div>
     </div>
     {% endif %}
 
@@ -548,7 +566,6 @@
             {% set l_groups = d.detailed_statistics.left.get(joint, {}).get('grouped_phases', []) %}
             {% set r_groups = d.detailed_statistics.right.get(joint, {}).get('grouped_phases', []) %}
 
-            {# Zjistíme maximální počet klipů, abychom mohli iterovat #}
             {% set max_clips = [l_groups|length, r_groups|length] | max %}
 
             {% if max_clips == 0 %}
@@ -1017,6 +1034,71 @@
         attachClick('plot-com');
     }
 
+    // --- RESIZE LOGIC ---
+    function initResizeHandler() {
+        const panel = document.getElementById('video-panel');
+        const handle = document.getElementById('resize-handle');
+
+        if (panel && handle) {
+            let isResizing = false;
+
+            handle.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                document.body.style.cursor = 'row-resize';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const rect = panel.getBoundingClientRect();
+                const newHeight = e.clientY - rect.top;
+                if (newHeight > 220 && newHeight < window.innerHeight * 0.9) {
+                    panel.style.height = `${newHeight}px`;
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.style.cursor = '';
+                    window.dispatchEvent(new Event('resize'));
+                }
+            });
+        }
+    }
+
+    // --- AUTO HEIGHT ADJUSTMENT ---
+    function adjustPlayerHeight() {
+        const panel = document.getElementById('video-panel');
+        const row = document.getElementById('video-row');
+        if (!panel || !row || videos.length === 0) return;
+
+        const vid = videos[0];
+        // Ensure metadata (dimensions) is loaded
+        if (vid.readyState < 1) {
+            vid.addEventListener('loadedmetadata', adjustPlayerHeight, { once: true });
+            return;
+        }
+
+        const aspect = vid.videoWidth / vid.videoHeight;
+        if (!aspect) return;
+
+        // Calculate width available for a single video
+        const rowWidth = row.clientWidth;
+        const gap = 15; // CSS gap between videos
+        const numVideos = videos.length;
+        const vidWidth = (rowWidth - ((numVideos - 1) * gap)) / numVideos;
+
+        // Calculate target height + overhead (controls, padding)
+        const targetVidHeight = vidWidth / aspect;
+        const overhead = panel.clientHeight - row.clientHeight;
+        const newHeight = targetVidHeight + overhead;
+
+        // Apply new height
+        const maxH = window.innerHeight * 0.8;
+        panel.style.height = `${Math.min(newHeight, maxH)}px`;
+    }
+
     // --- INITIALIZATION ---
     function init() {
         const rawK = RAW.raw_kinematics || {};
@@ -1088,6 +1170,8 @@
         document.getElementById('seek-bar').addEventListener('input', (e) => seek(e.target.value));
         document.addEventListener('fullscreenchange', handleFullscreenChange);
 
+        initResizeHandler();
+        adjustPlayerHeight();
         requestAnimationFrame(animationLoop);
     }
 
