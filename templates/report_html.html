@@ -513,7 +513,6 @@
             {% set l_groups = d.detailed_statistics.left.get(joint, {}).get('grouped_phases', []) %}
             {% set r_groups = d.detailed_statistics.right.get(joint, {}).get('grouped_phases', []) %}
 
-            {# Zjistíme maximální počet klipů #}
             {% set max_clips = [l_groups|length, r_groups|length] | max %}
 
             {% if max_clips == 0 %}
