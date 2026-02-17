@@ -136,6 +136,7 @@ class VideoGaitTUI(App):
         """Updates an Input widget's value and moves focus to the end of the text."""
         inp = self.query_one(input_id, Input)
         inp.value = str(value)
+        inp.focus()
         inp.action_end()
 
     def set_video_path(self, path: Path):
