@@ -396,8 +396,10 @@
                     <th class="text-left">Phase History</th>
                     <th>Frames</th>
                     <th>Duration (s)</th>
-                    <th>Mean</th>
-                    <th>Range</th>
+                    <th>Mean (°)</th>
+                    <th>Min (°)</th>
+                    <th>Max (°)</th>
+                    <th>Range (°)</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -408,7 +410,7 @@
 
                 {% set group = l_groups[i] %}
                 <tr>
-                    <td colspan="5" class="text-left"
+                    <td colspan="7" class="text-left"
                         style="background-color: #d6eaf8; color: #154360; font-weight: bold; border-top: 2px solid #a9cce3;">
                         LEFT - {{ group.name }}
                     </td>
@@ -419,6 +421,8 @@
                     <td style="font-family: monospace; font-size: 8.5pt;">{{ p.frames[0] }}-{{ p.frames[1] }}</td>
                     <td>{{ p.duration|fmt(2) }}</td>
                     <td>{{ p.mean|fmt(1) }}</td>
+                    <td>{{ p.min|fmt(1) }}</td>
+                    <td>{{ p.max|fmt(1) }}</td>
                     <td>{{ p.range|fmt(1) }}</td>
                 </tr>
                 {% endfor %}
@@ -426,7 +430,7 @@
                 {% if i < r_groups|length %}
                 {% set group = r_groups[i] %}
                 <tr>
-                    <td colspan="5" class="text-left"
+                    <td colspan="7" class="text-left"
                         style="background-color: #fadbd8; color: #78281f; font-weight: bold; border-top: 2px solid #f5b7b1;">
                         RIGHT - {{ group.name }}
                     </td>
@@ -437,6 +441,8 @@
                     <td style="font-family: monospace; font-size: 8.5pt;">{{ p.frames[0] }}-{{ p.frames[1] }}</td>
                     <td>{{ p.duration|fmt(2) }}</td>
                     <td>{{ p.mean|fmt(1) }}</td>
+                    <td>{{ p.min|fmt(1) }}</td>
+                    <td>{{ p.max|fmt(1) }}</td>
                     <td>{{ p.range|fmt(1) }}</td>
                 </tr>
                 {% endfor %}

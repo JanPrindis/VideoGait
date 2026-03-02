@@ -534,8 +534,10 @@
                                         <th class="text-left">Phase</th>
                                         <th>Frames</th>
                                         <th>Duration (s)</th>
-                                        <th>Mean</th>
-                                        <th>Range</th>
+                                        <th>Mean (°)</th>
+                                        <th>Min (°)</th>
+                                        <th>Max (°)</th>
+                                        <th>Range (°)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -545,6 +547,8 @@
                                         <td style="font-family: monospace; color: #666;">{{ p.frames[0] }}-{{ p.frames[1] }}</td>
                                         <td>{{ p.duration|fmt(2) }}</td>
                                         <td>{{ p.mean|fmt(1) }}</td>
+                                        <td>{{ p.min|fmt(1) }}</td>
+                                        <td>{{ p.max|fmt(1) }}</td>
                                         <td>{{ p.range|fmt(1) }}</td>
                                     </tr>
                                     {% endfor %}
@@ -569,8 +573,10 @@
                                         <th class="text-left">Phase</th>
                                         <th>Frames</th>
                                         <th>Duration (s)</th>
-                                        <th>Mean</th>
-                                        <th>Range</th>
+                                        <th>Mean (°)</th>
+                                        <th>Min (°)</th>
+                                        <th>Max (°)</th>
+                                        <th>Range (°)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -580,7 +586,10 @@
                                         <td style="font-family: monospace; color: #666;">{{ p.frames[0] }}-{{ p.frames[1] }}</td>
                                         <td>{{ p.duration|fmt(2) }}</td>
                                         <td>{{ p.mean|fmt(1) }}</td>
+                                        <td>{{ p.min|fmt(1) }}</td>
+                                        <td>{{ p.max|fmt(1) }}</td>
                                         <td>{{ p.range|fmt(1) }}</td>
+                                    </tr>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
