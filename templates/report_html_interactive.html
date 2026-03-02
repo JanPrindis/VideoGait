@@ -927,11 +927,11 @@
     function plotAvgCycle(joint) {
         const stats = RAW.kinematics_stats;
         if (!stats) return;
+
         let kws = [];
-        if (joint === 'Hip') kws = ['HIP'];
-        if (joint === 'Knee') kws = ['KNEE', 'ANKLE'];
-        if (joint === 'Ankle') kws = ['ANKLE', 'FOOT'];
+        if (joint === 'Hip') kws = ['SHOULDER', 'HIP', 'KNEE'];
         if (joint === 'Knee') kws = ['HIP', 'KNEE', 'ANKLE'];
+        if (joint === 'Ankle') kws = ['KNEE', 'ANKLE', 'FOOT'];
 
         const keyL = findKey(stats, [...kws, 'LEFT']);
         const keyR = findKey(stats, [...kws, 'RIGHT']);
@@ -982,10 +982,11 @@
     function plotTimeline(joint) {
         const raw = RAW.raw_kinematics;
         if (!raw) return;
+
         let kws = [];
-        if (joint === 'Hip') kws = ['HIP'];
+        if (joint === 'Hip') kws = ['SHOULDER', 'HIP', 'KNEE'];
         if (joint === 'Knee') kws = ['HIP', 'KNEE', 'ANKLE'];
-        if (joint === 'Ankle') kws = ['ANKLE', 'FOOT'];
+        if (joint === 'Ankle') kws = ['KNEE', 'ANKLE', 'FOOT'];
 
         const keyL = findKey(raw, [...kws, 'LEFT']);
         const keyR = findKey(raw, [...kws, 'RIGHT']);
