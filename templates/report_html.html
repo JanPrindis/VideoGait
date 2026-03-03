@@ -431,29 +431,31 @@
                 <table>
                     <thead>
                     <tr>
-                        <th class="text-left">Joint Pair</th>
-                        <th>ACC (Similarity)</th>
+                        <th class="text-left">Cyclogram</th>
+                        <th>Shape Similarity (NCC)</th>
                         <th>Area L (deg²)</th>
                         <th>Area R (deg²)</th>
-                        <th>Area Symmetry (%)</th>
+                        <th>Area Symmetry (SI)</th>
                     </tr>
                     </thead>
                     <tbody>
                     {% for pair_name, stats in d.coordination_statistics.items() %}
                     <tr>
                         <td class="text-left" style="font-weight: bold;">{{ pair_name }}</td>
-                        <td class="highlight">{{ stats.ACC|fmt(3) }}</td>
-                        <td>{{ stats.Area_L|fmt(0) }}</td>
-                        <td>{{ stats.Area_R|fmt(0) }}</td>
+                        <td class="highlight">{{ stats.Shape_Similarity_NCC|fmt(3) }}</td>
+                        <td>{{ stats.Area_L|fmt(1) }}</td>
+                        <td>{{ stats.Area_R|fmt(1) }}</td>
                         <td>{{ stats.Area_Sym|fmt(1) }} %</td>
                     </tr>
                     {% endfor %}
                     </tbody>
                 </table>
                 <div class="footnote">
-                    <div style="margin-bottom: 4px;"><strong>* ACC (Angular Coefficient of Correspondence):</strong> Measures shape similarity between left and right gait loops. 1.0 indicates an identical pattern.</div>
-                    <div><strong>* Area Symmetry (NSI):</strong> Normalized Symmetry Index. Scales area difference relative to the total joint excursion box for robust symmetry evaluation (Queen et al., 2020).</div>
+                    <div style="margin-bottom: 4px;"><strong>* Shape Similarity (NCC):</strong> 2D Normalized Cross-Correlation comparing the kinematic shape of the Left vs. Right gait loops (1.0 = identical pattern) (Ogihara et al., 2020).</div>
+                    <div style="margin-bottom: 4px;"><strong>* Area:</strong> Area of the closed trajectory representing the conjoint range of motion of the two joints (Pau et al., 2022).</div>
+                    <div><strong>* Area Symmetry:</strong> Symmetry Index (SI) of the loop areas (0% = perfect symmetry).</div>
                 </div>
+            </div>
         </div>
         {% endif %}
 

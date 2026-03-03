@@ -522,7 +522,7 @@ class GaitAnalyzer:
         Returns:
             dict: Dictionary of calculated angles (list of floats per frame).
         """
-        # 1. Initial Direction Detection
+        # Initial Direction Detection
         any_key = next(iter(kps))
         total_frames = len(kps[any_key])
         directions = np.ones(total_frames)
@@ -661,18 +661,23 @@ class GaitAnalyzer:
     @staticmethod
     def _calc_coordination_metrics(cycles):
         """
-        Calculates ACC (shape similarity) and Cyclogram Area.
-        Area Symmetry uses Normalized Symmetry Index (NSI) to prevent inflated SI in small joints.
-        Based on Queen et al. (2020).
+        Calculates Inter-joint Coordination and Symmetry using Intralimb Cyclograms.
+        - Area: Represents conjoint range of motion (Fadda/Pau et al., 2022).
+        - Shape Similarity (NCC): Evaluates kinematic shape symmetry between Left and Right loop (Ogihara et al., 2020).
+        - Area Symmetry: Symmetry Index of the loop areas.
         """
         stats = {}
-        pairs = [("Hip-Knee", ["SHOULDER", "HIP", "KNEE"], ["HIP", "KNEE", "ANKLE"]),
-                 ("Knee-Ankle", ["HIP", "KNEE", "ANKLE"], ["KNEE-ANKLE-FOOT"])]
+        pairs = [
+            ("Hip-Knee", ["SHOULDER", "HIP", "KNEE"], ["HIP", "KNEE", "ANKLE"]),
+            ("Knee-Ankle", ["HIP", "KNEE", "ANKLE"], ["KNEE", "ANKLE", "FOOT"])
+        ]
 
         def poly_area(x, y):
+            # Shoelace formula for calculating the area of a polygon
             return 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
 
-        def calc_acc(x1, y1, x2, y2):
+        def calc_ncc(x1, y1, x2, y2):
+            # 2D Normalized Cross-Correlation for kinematic shape similarity
             x1_c, y1_c = x1 - np.mean(x1), y1 - np.mean(y1)
             x2_c, y2_c = x2 - np.mean(x2), y2 - np.mean(y2)
             num = np.sum(x1_c * x2_c + y1_c * y2_c)
@@ -682,6 +687,7 @@ class GaitAnalyzer:
         for name, kw_x, kw_y in pairs:
             lx_k = next((k for k in cycles if all(w in k for w in kw_x) and "LEFT" in k), None)
             ly_k = next((k for k in cycles if all(w in k for w in kw_y) and "LEFT" in k), None)
+
             rx_k = next((k for k in cycles if all(w in k for w in kw_x) and "RIGHT" in k), None)
             ry_k = next((k for k in cycles if all(w in k for w in kw_y) and "RIGHT" in k), None)
 
@@ -689,18 +695,21 @@ class GaitAnalyzer:
                 lx, ly = np.array(cycles[lx_k]['mean']), np.array(cycles[ly_k]['mean'])
                 rx, ry = np.array(cycles[rx_k]['mean']), np.array(cycles[ry_k]['mean'])
 
+                # Area of the loop
                 area_l, area_r = poly_area(lx, ly), poly_area(rx, ry)
 
-                # NSI Logic: Scales area difference to the combined movement range
-                # instead of just dividing by the mean area.
-                all_x, all_y = np.concatenate([lx, rx]), np.concatenate([ly, ry])
-                total_box_area = (np.max(all_x) - np.min(all_x)) * (np.max(all_y) - np.min(all_y))
-                nsi_area = (abs(area_l - area_r) / total_box_area * 100) if total_box_area > 0 else 0.0
+                # Area Symmetry Index
+                mean_area = 0.5 * (area_l + area_r)
+                area_sym = (abs(area_l - area_r) / mean_area * 100) if mean_area > 0 else 0.0
+
+                # NCC
+                shape_sim = calc_ncc(lx, ly, rx, ry)
 
                 stats[name] = {
-                    "ACC": float(calc_acc(lx, ly, rx, ry)),
-                    "Area_L": float(area_l), "Area_R": float(area_r),
-                    "Area_Sym": float(nsi_area)
+                    "Shape_Similarity_NCC": float(shape_sim),
+                    "Area_L": float(area_l),
+                    "Area_R": float(area_r),
+                    "Area_Sym": float(area_sym)
                 }
         return stats
 

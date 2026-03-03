@@ -285,7 +285,7 @@
 </div>
 
 <!-- SECTION 2: COORDINATION -->
-<h2 style="page-break-before: auto; margin-top: 30px;">2. Coordination</h2>
+<h2 style="page-break-before: auto; margin-top: 30px;">2. Inter-joint Coordination</h2>
 
 {% if d.coordination_statistics %}
 <div class="row">
@@ -293,8 +293,8 @@
         <table>
             <thead>
             <tr>
-                <th class="text-left">Joint Pair</th>
-                <th>ACC (Similarity)</th>
+                <th class="text-left">Cyclogram</th>
+                <th>Shape Similarity (NCC)</th>
                 <th>Area L (deg²)</th>
                 <th>Area R (deg²)</th>
                 <th>Area Symmetry (%)</th>
@@ -304,14 +304,17 @@
             {% for pair_name, stats in d.coordination_statistics.items() %}
             <tr>
                 <td class="text-left"><strong>{{ pair_name }}</strong></td>
-                <td class="highlight">{{ stats.ACC|fmt(3) }}</td>
-                <td>{{ stats.Area_L|fmt(0) }}</td>
-                <td>{{ stats.Area_R|fmt(0) }}</td>
+                <td class="highlight">{{ stats.Shape_Similarity_NCC|fmt(3) }}</td>
+                <td>{{ stats.Area_L|fmt(1) }}</td>
+                <td>{{ stats.Area_R|fmt(1) }}</td>
                 <td>{{ stats.Area_Sym|fmt(1) }} %</td>
             </tr>
             {% endfor %}
             </tbody>
         </table>
+        <div class="caption" style="text-align: left; padding-left: 5px;">
+            * NCC: Normalized Cross-Correlation (1.0 = identical shape). Area: Conjoint range of angular motion.
+        </div>
     </div>
 </div>
 {% endif %}
@@ -319,13 +322,13 @@
 <div class="row">
     {% if 'Hip' in joints and 'Knee' in joints %}
     <div class="col-50">{% set hk=img.cyclogram('hip','knee') %}{% if hk %}<img src="{{ hk }}">
-        <div class="caption">Hip-Knee</div>
+        <div class="caption">Hip-Knee Cyclogram</div>
         {% endif %}
     </div>
     {% endif %}
     {% if 'Knee' in joints and 'Ankle' in joints %}
     <div class="col-50">{% set ka=img.cyclogram('knee','ankle') %}{% if ka %}<img src="{{ ka }}">
-        <div class="caption">Knee-Ankle</div>
+        <div class="caption">Knee-Ankle Cyclogram</div>
         {% endif %}
     </div>
     {% endif %}
