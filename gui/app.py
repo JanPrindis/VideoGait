@@ -50,6 +50,9 @@ class VideoGaitTUI(App):
     CSS_PATH = "styles.tcss"
     TITLE = "VideoGait Dashboard"
     last_report_path = None
+    last_video_start = Path("./videos")
+    last_config_start = Path("./configs/app")
+    last_output_start = Path("./")
 
     def compose(self) -> ComposeResult:
         """Constructs the UI layout."""
@@ -111,23 +114,23 @@ class VideoGaitTUI(App):
 
         if bid == "btn_browse_video":
             # Filter out only video files
+            start_path = self.last_video_start if self.last_video_start.exists() else Path(".")
             self.push_screen(
-                FilePicker("./videos", allowed_extensions=[".mov", ".mp4", ".avi", ".mkv"]),
+                FilePicker(start_path, allowed_extensions=[".mov", ".mp4", ".avi", ".mkv"]),
                 self.set_video_path
             )
 
         elif bid == "btn_browse_config":
             # Filter out only config files
-            start_cfg = Path("./configs/app").resolve()
-            if not start_cfg.exists(): start_cfg = Path("./")
-
+            start_path = self.last_config_start if self.last_config_start.exists() else Path(".")
             self.push_screen(
-                FilePicker(start_cfg, allowed_extensions=[".yaml", ".yml"]),
+                FilePicker(start_path, allowed_extensions=[".yaml", ".yml"]),
                 self.set_config_path
             )
 
         elif bid == "btn_browse_output":
-            self.push_screen(DirPicker("./"), self.set_output_path)
+            start_path = self.last_output_start if self.last_output_start.exists() else Path(".")
+            self.push_screen(DirPicker(start_path), self.set_output_path)
 
         elif bid == "btn_run":
             self.run_process()
@@ -153,6 +156,7 @@ class VideoGaitTUI(App):
         """Callback for the video file picker."""
         if path:
             self.update_input_end_focused("#input_video", str(path))
+            self.last_video_start = path.parent
 
             # Auto-name logic
             name_input = self.query_one("#input_name", Input)
@@ -163,11 +167,13 @@ class VideoGaitTUI(App):
         """Callback for the config file picker."""
         if path:
             self.update_input_end_focused("#input_config", str(path))
+            self.last_config_start = path.parent
 
     def set_output_path(self, path: Path):
         """Callback for the output directory picker."""
         if path:
             self.update_input_end_focused("#input_output", str(path))
+            self.last_output_start = path
 
     # --- WORKER ---
     @work(thread=True)
