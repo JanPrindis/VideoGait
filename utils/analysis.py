@@ -833,12 +833,17 @@ class GaitAnalyzer:
                     if in_valid_range:
                         # Extract signal segment
                         raw_cycle = signal[start: end + 1]
-                        raw_cycle = [r for r in raw_cycle if r is not None]
 
-                        if len(raw_cycle) > 5:
-                            # Normalize to 100 points
-                            x_orig = np.linspace(0, 1, len(raw_cycle))
-                            interp = interp1d(x_orig, raw_cycle, kind='linear')
+                        # Extract original indices
+                        valid_indices = [idx for idx, val in enumerate(raw_cycle) if val is not None]
+                        valid_pts = [val for val in raw_cycle if val is not None]
+
+                        # Interpolate and normalize to 100 points
+                        if len(valid_pts) > 5:
+                            x_orig = np.array(valid_indices) / max(1, (len(raw_cycle) - 1))
+
+                            interp = interp1d(x_orig, valid_pts, kind='linear', bounds_error=False,
+                                              fill_value="extrapolate")
                             normalized = interp(np.linspace(0, 1, 100))
                             cycles.append(normalized)
 
