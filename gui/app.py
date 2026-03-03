@@ -25,6 +25,12 @@ from utils.logger import log
 
 
 def open_file(path: str):
+    """
+    Opens a file or directory with the default system application.
+
+    Args:
+        path (str): The path to the file or directory to open.
+    """
     if platform.system() == "Windows":
         os.startfile(path)
     elif platform.system() == "Darwin":  # macOS

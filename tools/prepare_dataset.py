@@ -20,13 +20,26 @@ from utils.config_models import AppConfig, PreprocessingConfig, VisualizationCon
     PoseDetectorRef, EventDetectorConfig, HeuristicConfig
 
 class GracefulKiller:
+    """
+    Handles SIGINT and SIGTERM to allow for graceful shutdown of long-running processes.
+
+    Allows the script to finish its current file operation before exiting.
+    A second signal will force an immediate exit.
+    """
     kill_now = False
     def __init__(self):
+        """Initializes the signal handlers."""
         signal.signal(signal.SIGINT, self.exit_gracefully)
         signal.signal(signal.SIGTERM, self.exit_gracefully)
         self.signal_count = 0
 
     def exit_gracefully(self, signum, frame):
+        """
+        Signal handler that sets the `kill_now` flag.
+
+        On the first signal, it prints a warning and sets the flag.
+        On the second signal, it forces an immediate exit.
+        """
         self.signal_count += 1
         if self.signal_count >= 2:
             print()
@@ -325,6 +338,18 @@ def detect_and_visualize(dataset_root, target_fps_list, detector_configs, skip_v
 
 
 def recalculate_annotations(annotations_root_path, killer=None):
+    """
+    Recalculates event frame numbers from original annotations to new target framerates.
+
+    It reads JSON files from the 'ORIGINAL' subdirectory, scales the 'frame'
+    number for each event based on the target FPS, and saves new annotation
+
+    files in subdirectories named after the target framerate (e.g., '60', '120').
+
+    Args:
+        annotations_root_path (str): The root directory containing the 'ORIGINAL' folder.
+        killer (GracefulKiller, optional): Signal handler to allow for graceful shutdown.
+    """
     all_files = glob(annotations_root_path + "/ORIGINAL/*.json")
 
     for out_framerate in [60, 120]:
