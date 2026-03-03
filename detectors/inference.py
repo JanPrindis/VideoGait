@@ -39,7 +39,13 @@ def resolve_path(path_str: str, root: Path):
         return (root / p).resolve()
 
 
-def run_pose_extraction(app_config: AppConfig, video_path: str, output_root: str = None, run_name: str = None):
+def run_pose_extraction(
+        app_config: AppConfig,
+        video_path: str,
+        output_root: str = None,
+        run_name: str = None,
+        keypoint_filename_override: str = None
+):
     """
     Runs the pose extraction pipeline on a single video.
 
@@ -51,6 +57,7 @@ def run_pose_extraction(app_config: AppConfig, video_path: str, output_root: str
         video_path (str): Path to the input video file.
         output_root (str, optional): Override for the output root directory.
         run_name (str, optional): Name for the output subdirectory (defaults to video filename).
+        keypoint_filename_override (str, optional): Override for the output keypoint JSON filename.
 
     Raises:
         FileNotFoundError: If the video file or detector config is not found.
@@ -107,7 +114,7 @@ def run_pose_extraction(app_config: AppConfig, video_path: str, output_root: str
 
     log("DETECTOR", f"Processing: {vid_path.name}", level="info")
     try:
-        detector.detect(str(vid_path), str(final_out_path))
+        detector.detect(str(vid_path), str(final_out_path), keypoint_filename_override=keypoint_filename_override)
 
     except Exception as e:
         log("DETECTOR", f"Critical Error: {e}", level="error")

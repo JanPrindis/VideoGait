@@ -102,12 +102,12 @@ class AlphaPose(BaseDetector):
         # Determine Eval Joints (from writer.py update())
         self.eval_joints = list(range(26))  # Default for Halpe26
 
-    def detect(self, video_path, output_path):
+    def detect(self, video_path, output_path, keypoint_filename_override: str = None):
         v_path = Path(video_path).resolve()
         save_dir = Path(output_path).resolve()
 
         save_dir.mkdir(parents=True, exist_ok=True)
-        json_filename = f"{v_path.stem}.json"
+        json_filename = keypoint_filename_override if keypoint_filename_override else "keypoints.json"
         serializer = KeypointSerializer(str(save_dir), json_filename)
 
         original_cwd = os.getcwd()

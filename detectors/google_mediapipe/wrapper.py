@@ -39,14 +39,14 @@ class PoseLandmarker(BaseDetector):
             min_tracking_confidence = self.config.get("min_tracking", 0.5)
         )
 
-    def detect(self, video_path, output_path):
+    def detect(self, video_path, output_path, keypoint_filename_override: str = None):
         v_path = Path(video_path).resolve()
         save_dir = Path(output_path).resolve()
 
         # Create output folder
         save_dir.mkdir(parents=True, exist_ok=True)
 
-        json_filename = f"{v_path.stem}.json"
+        json_filename = keypoint_filename_override if keypoint_filename_override else "keypoints.json"
         serializer = KeypointSerializer(str(save_dir), json_filename)
 
         # Load input video

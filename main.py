@@ -212,7 +212,7 @@ def run_analysis_pipeline(
     event_detector_func = run_heuristic_inference if method == "Heuristic" else run_nn_inference
     event_data = event_detector_func(
         app_config=app_config,
-        input_path=str(output_dir / f"{an_name}.json"),
+        input_path=str(output_dir / "keypoints.json"),
         output_dir=str(output_dir)
     )
 
@@ -245,7 +245,7 @@ def run_analysis_pipeline(
     visualizer.process_video(
         video_path=current_video_path,
         output_root=str(output_dir),
-        keypoints_data=str(output_dir / f"{an_name}.json"),
+        keypoints_data=str(output_dir / "keypoints.json"),
         valid_ranges=event_data["global_ranges"],
         gait_data=gait_data
     )
@@ -253,7 +253,7 @@ def run_analysis_pipeline(
     # --- RUN ANALYSIS ---
     analyzer = GaitAnalyzer(app_config)
     analysis_report = analyzer.run_analysis(
-        keypoints_path=str(output_dir / f"{an_name}.json"),
+        keypoints_path=str(output_dir / "keypoints.json"),
         events_data=event_data,
         gait_data=gait_data,
         output_dir=str(output_dir)

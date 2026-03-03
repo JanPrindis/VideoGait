@@ -69,15 +69,15 @@ class RTMLib(BaseDetector):
             tracking=tracking,
         )
 
-    def detect(self, video_path, output_path):
+    def detect(self, video_path, output_path, keypoint_filename_override: str = None):
         v_path = Path(video_path).resolve()
         save_dir = Path(output_path).resolve()
 
         # Create output directory
         save_dir.mkdir(parents=True, exist_ok=True)
 
-        # Get output filename: video.mp4 -> video.json
-        json_filename = f"{v_path.stem}.json"
+        # Get output filename
+        json_filename = keypoint_filename_override if keypoint_filename_override else "keypoints.json"
 
         cap = cv2.VideoCapture(str(v_path))
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))

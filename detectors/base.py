@@ -25,13 +25,14 @@ class BaseDetector(ABC):
         self.config = config
 
     @abstractmethod
-    def detect(self, video_path: str, output_path: str):
+    def detect(self, video_path: str, output_path: str, keypoint_filename_override: str = None):
         """
         Runs pose detection on a video file.
 
         Args:
             video_path (str): Path to the input video file.
             output_path (str): Path to the directory where results should be saved.
+            keypoint_filename_override (str, optional): Override for the output keypoint JSON filename.
         """
         pass
 
