@@ -558,28 +558,6 @@ class GaitAnalyzer:
                 angle = self._calculate_2d_angle(v1, v2, v3, joint_type)
                 values_list.append(angle)
 
-            # Force Polarity
-            # If the calculated hip angle is mostly negative, it means direction detection failed.
-            if joint_type == "hip":
-                ranges_to_check = valid_ranges if valid_ranges else [(0, total_frames - 1)]
-
-                for start, end in ranges_to_check:
-                    # Extract segment indices that have data
-                    segment_indices = [i for i in range(start, min(end + 1, len(values_list))) if
-                                       values_list[i] is not None]
-
-                    if not segment_indices:
-                        continue
-
-                    # Calculate mean of the segment
-                    segment_vals = [values_list[i] for i in segment_indices]
-                    mean_val = np.mean(segment_vals)
-
-                    # If Hip angle is negative on average, flip the whole segment
-                    if mean_val < 0:
-                        for i in segment_indices:
-                            values_list[i] *= -1.0
-
             angles_data[output_name] = values_list
 
         return angles_data
