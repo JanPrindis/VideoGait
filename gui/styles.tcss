@@ -132,6 +132,7 @@ DirectoryTree, FilteredDirectoryTree {
 }
 
 #btn_open_report { display: none; }
+#btn_regenerate_report { display: none; }
 
 /* --- OUTPUT AREA & TQDM BAR --- */
 #output-area {

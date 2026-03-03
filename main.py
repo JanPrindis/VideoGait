@@ -11,6 +11,7 @@ This script orchestrates the entire workflow:
 """
 import os
 import sys
+import json
 from pathlib import Path
 
 from utils.config_models import AppConfig, TrainConfig
@@ -35,6 +36,60 @@ from utils.analysis import GaitAnalyzer
 from utils.plotting import GaitPlotter
 from utils.report_generator import ReportGenerator
 from utils.config_utils import resolve_skeleton_name_from_config, load_and_validate_yaml
+
+
+def _setup_pipeline_environment(
+        app_config_path: str,
+        input_video_path: str,
+        analysis_name_override: str,
+        output_root_override: str
+):
+    """Loads config and sets up output paths common to all pipelines."""
+    # --- CONFIG LOADING ---
+    if not os.path.exists(app_config_path):
+        log("PIPELINE", f"Config not found at {app_config_path}", level="error")
+        return None, None, None
+
+    try:
+        app_config: AppConfig = load_and_validate_yaml(app_config_path, AppConfig)
+    except ValueError as e:
+        log("CONFIG", str(e), level="error")
+        return None, None, None
+
+    # --- OUTPUT DIRECTORY SETUP ---
+    res_root = output_root_override or app_config.output.output_root_dir
+    if analysis_name_override:
+        an_name = analysis_name_override
+    else:
+        an_name = Path(input_video_path).stem
+
+    output_dir = Path(res_root) / an_name
+    return app_config, output_dir, an_name
+
+
+def _generate_plots_and_report(app_config: AppConfig, output_dir: Path, analysis_report: dict, an_name: str, output_format: str):
+    """Helper to generate plots and the final report file."""
+    # --- GENERATE PLOTS ---
+    if output_format == "interactive":
+        log("PIPELINE", "Interactive HTML selected, skipping plots generation.", level="warning")
+    else:
+        plotter = GaitPlotter(str(output_dir / "plots"))
+        plotter.generate_plots_from_json(analysis_source=analysis_report)
+
+    # --- EXPORT ---
+    # TODO: Annoying setup - document: https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation
+    report_generator = ReportGenerator(
+        app_config=app_config,
+        output_dir=str(output_dir),
+    )
+
+    report_generator.export(
+        analysis_source=analysis_report,
+        graphs_dir=str(output_dir / "plots"),
+        video_dir=str(output_dir),
+        filename_base=f"{an_name}_report",
+        output_type=output_format
+    )
 
 
 def run_analysis_pipeline(
@@ -64,30 +119,14 @@ def run_analysis_pipeline(
     log("PIPELINE", f"Input Video: {input_video_path}", level="info")
     log("PIPELINE", f"Config: {app_config_path}", level="info")
 
-    # --- CONFIG LOADING ---
-    if not os.path.exists(app_config_path):
-        log("PIPELINE", f"Config not found at {app_config_path}", level="error")
+    # --- SETUP ---
+    app_config, output_dir, an_name = _setup_pipeline_environment(
+        app_config_path, input_video_path, analysis_name_override, output_root_override
+    )
+    if not app_config:
         return None
 
-    try:
-        app_config: AppConfig = load_and_validate_yaml(app_config_path, AppConfig)
-    except ValueError as e:
-        log("CONFIG", str(e), level="error")
-        return None
-
-    # --- OUTPUT DIRECTORY SETUP ---
-    # Get output root folder
-    res_root = output_root_override or app_config.output.output_root_dir
-
-    # Get analysis folder name
-    if analysis_name_override:
-        an_name = analysis_name_override
-    else:
-        # Use name
-        an_name = Path(input_video_path).stem
-
-    # Final path: project_root / results / analysis_name
-    output_dir = Path(res_root) / an_name
+    # Create directory if it doesn't exist for the main pipeline
     output_dir.mkdir(parents=True, exist_ok=True)
     log("PIPELINE", f"Output Directory: {output_dir}", level="info")
 
@@ -165,7 +204,7 @@ def run_analysis_pipeline(
     run_pose_extraction(
         app_config=app_config,
         video_path=current_video_path,
-        output_root=res_root,
+        output_root=str(output_dir.parent),
         run_name=an_name,
     )
 
@@ -224,26 +263,55 @@ def run_analysis_pipeline(
         log("PIPELINE", "Gait Analysis failed (returned None). Skipping plots and report.", level="error")
         return None
 
-    # --- GENERATE PLOTS ---
-    if output_format == "interactive":
-        log("PIPELINE", "Interactive HTML selected, skipping plots generation.", level="warning")
-    else:
-        plotter = GaitPlotter(str(output_dir / "plots"))
-        plotter.generate_plots_from_json(analysis_source=analysis_report)
-
-    # --- EXPORT ---
-    # TODO: Annoying setup - document: https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation
-    report_generator = ReportGenerator(
+    # --- GENERATE PLOTS & REPORT ---
+    _generate_plots_and_report(
         app_config=app_config,
-        output_dir=str(output_dir),
+        output_dir=output_dir,
+        analysis_report=analysis_report,
+        an_name=an_name,
+        output_format=output_format
     )
 
-    report_generator.export(
-        analysis_source=analysis_report,
-        graphs_dir=str(output_dir / "plots"),
-        video_dir=str(output_dir),
-        filename_base=f"{an_name}_report",
-        output_type=output_format
+    return str(output_dir)
+
+
+def regenerate_report_pipeline(
+    input_video_path: str,
+    app_config_path: str,
+    analysis_name_override: str = None,
+    output_root_override: str = None,
+    output_format: str = 'pdf'
+):
+    log("PIPELINE", "Regenerating report...", level="info")
+
+    # --- SETUP ---
+    app_config, output_dir, an_name = _setup_pipeline_environment(
+        app_config_path, input_video_path, analysis_name_override, output_root_override
+    )
+    if not app_config:
+        return None
+
+    # Check for existing directory in regenerate pipeline
+    if not output_dir.exists():
+        log("PIPELINE", f"Output directory not found: {output_dir}", level="error")
+        return None
+
+    # --- LOAD ANALYSIS RESULTS ---
+    analysis_path = output_dir / "analysis.json"
+    if not analysis_path.exists():
+        log("PIPELINE", f"Analysis file not found: {analysis_path}. Cannot regenerate report.", level="error")
+        return None
+
+    with open(analysis_path, 'r') as f:
+        analysis_report = json.load(f)
+
+    # --- GENERATE PLOTS & REPORT ---
+    _generate_plots_and_report(
+        app_config=app_config,
+        output_dir=output_dir,
+        analysis_report=analysis_report,
+        an_name=an_name,
+        output_format=output_format
     )
 
     return str(output_dir)

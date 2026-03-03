@@ -18,7 +18,7 @@ from textual.containers import Vertical
 from textual.widgets import Header, Footer, Button, Input, Label, RichLog, Select
 from textual import work
 
-from main import run_analysis_pipeline
+from main import run_analysis_pipeline, regenerate_report_pipeline
 from gui.logging import SmartLogger
 from gui.screens import FilePicker, DirPicker
 from utils.logger import log
@@ -94,6 +94,7 @@ class VideoGaitTUI(App):
 
             yield Button("START ANALYSIS", variant="success", id="btn_run")
             yield Button("OPEN REPORT", variant="primary", id="btn_open_report")
+            yield Button("REGENERATE REPORT", variant="primary", id="btn_regenerate_report")
 
         # --- OUTPUT AREA ---
         with Vertical(id="output-area"):
@@ -136,6 +137,9 @@ class VideoGaitTUI(App):
                 open_file(self.last_report_path)
             else:
                 self.notify("Report file not found!", severity="error")
+
+        elif bid == "btn_regenerate_report":
+            self.regenerate_process()
 
     # --- CALLBACKS ---
     def update_input_end_focused(self, input_id: str, value: str):
@@ -187,6 +191,7 @@ class VideoGaitTUI(App):
         step_lbl = self.query_one("#step_label", Label)
         btn_run = self.query_one("#btn_run", Button)
         btn_open = self.query_one("#btn_open_report", Button)
+        btn_regen = self.query_one("#btn_regenerate_report", Button)
 
         self.call_from_thread(status_widget.update, "Running")
 
@@ -246,6 +251,7 @@ class VideoGaitTUI(App):
 
             # Hide results button while starting a new analysis
             self.call_from_thread(setattr, btn_open, "display", "none")
+            self.call_from_thread(setattr, btn_regen, "display", "none")
 
             # Clear the output logs before starting a new analysis
             self.call_from_thread(log_widget.clear)
@@ -279,6 +285,7 @@ class VideoGaitTUI(App):
                 if report_file.exists():
                     self.last_report_path = str(report_file)
                     self.call_from_thread(setattr, btn_open, "display", "block")
+                    self.call_from_thread(setattr, btn_regen, "display", "block")
                 else:
                     log("GUI", f"Report generated, but could not locate file: {report_file.name}", level="warning")  #
             else:
@@ -299,4 +306,93 @@ class VideoGaitTUI(App):
             sys.stderr = original_stderr
             self.call_from_thread(setattr, btn_run, "label", "START ANALYSIS")
             self.call_from_thread(setattr, btn_run, "disabled", False)
+            self.call_from_thread(status_widget.update, "Ready")
+
+    @work(thread=True)
+    def regenerate_process(self):
+        """
+        Executes the report regeneration in a separate thread.
+        """
+        # Get data
+        video_path_str = self.query_one("#input_video", Input).value.strip()
+        config_path_str = self.query_one("#input_config", Input).value.strip()
+        out_override_str = self.query_one("#input_output", Input).value.strip()
+        name = self.query_one("#input_name", Input).value.strip() or None
+        output_format = self.query_one("#select_output_type", Select).value
+
+        # Widgets
+        log_widget = self.query_one("#console_log", RichLog)
+        status_widget = self.query_one("#status_line", Label)
+        step_lbl = self.query_one("#step_label", Label)
+        btn_run = self.query_one("#btn_run", Button)
+        btn_open = self.query_one("#btn_open_report", Button)
+        btn_regen = self.query_one("#btn_regenerate_report", Button)
+
+        # --- UI LOCK ---
+        self.call_from_thread(setattr, btn_run, "disabled", True)
+        self.call_from_thread(setattr, btn_open, "disabled", True)
+        self.call_from_thread(setattr, btn_regen, "disabled", True)
+        self.call_from_thread(step_lbl.update, "Regenerating...")
+        self.call_from_thread(status_widget.update, "Regenerating Report")
+
+        # --- SETUP LOGGING ---
+        original_stdout = sys.stdout
+        original_stderr = sys.stderr
+        logger_out = SmartLogger(log_widget, status_widget, self, is_error=False)
+        logger_err = SmartLogger(log_widget, status_widget, self, is_error=True)
+
+        try:
+            sys.stdout = logger_out
+            sys.stderr = logger_err
+
+            self.call_from_thread(log_widget.write, f"[bold cyan]--- REGENERATING REPORT ---[/]")
+
+            # Run regeneration
+            result_path = regenerate_report_pipeline(
+                input_video_path=video_path_str,
+                app_config_path=config_path_str,
+                analysis_name_override=name,
+                output_root_override=out_override_str,
+                output_format=output_format
+            )
+
+            if not result_path:
+                raise Exception("Regeneration failed.")
+
+            # Update report path logic
+            if output_format == "pdf":
+                ext = "pdf"
+            elif output_format == "html" or output_format == "interactive":
+                ext = "html"
+            else:
+                ext = None
+
+            suffix = "_interactive" if output_format == "interactive" else ""
+
+            if ext:
+                report_file = Path(result_path) / f"{name}_report{suffix}.{ext}"
+                if report_file.exists():
+                    self.last_report_path = str(report_file)
+                    # Ensure buttons are visible (they might be already)
+                    self.call_from_thread(setattr, btn_open, "display", "block")
+                    self.call_from_thread(setattr, btn_regen, "display", "block")
+                else:
+                    log("GUI", f"Report generated, but could not locate file: {report_file.name}", level="warning")
+
+            self.call_from_thread(log_widget.write, f"[bold green]Regeneration Complete![/]")
+            self.call_from_thread(step_lbl.update, "COMPLETED")
+            self.notify("Report Regenerated!")
+
+        except Exception as e:
+            self.call_from_thread(log_widget.write, f"[bold red]ERROR: {e}[/]")
+            import traceback
+            self.call_from_thread(log_widget.write, traceback.format_exc())
+            self.call_from_thread(step_lbl.update, "ERROR")
+
+        finally:
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+            self.call_from_thread(setattr, btn_run, "disabled", False)
+            self.call_from_thread(setattr, btn_open, "disabled", False)
+            self.call_from_thread(setattr, btn_regen, "disabled", False)
             self.call_from_thread(status_widget.update, "Ready")
