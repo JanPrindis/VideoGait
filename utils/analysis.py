@@ -107,6 +107,9 @@ class GaitAnalyzer:
         # Symmetry Analysis (Left vs Right comparison)
         symmetry_stats = self._calc_symmetry_metrics(spatiotemporal, cycles_stats)
 
+        # Coordination Analysis (ACC, Area)
+        coordination_stats = self._calc_coordination_metrics(cycles_stats)
+
         # --- EXPORT ---
         phases_export = {
             "left": [self._serialize_phase(p) for p in l_phases],
@@ -127,6 +130,7 @@ class GaitAnalyzer:
             "kinematics_stats": cycles_stats,
             "detailed_statistics": detailed_stats,
             "symmetry_statistics": symmetry_stats,
+            "coordination_statistics": coordination_stats,
             "raw_kinematics": kinematics_raw,
             "com_analysis": com_analysis
         }
@@ -353,60 +357,68 @@ class GaitAnalyzer:
     @staticmethod
     def _calc_symmetry_metrics(spatio, cycles):
         """
-        Calculates Symmetry Index (SI) as a percentage.
-        Formula: SI = |L - R| / (0.5 * (L + R)) * 100
-        0% indicates perfect symmetry.
+        Calculates symmetry metrics between left and right gait parameters.
+
+        Computes the Symmetry Index (SI) for spatiotemporal parameters and detailed
+        differences (Mean, Min, Max, ROM) for kinematic signals.
 
         Args:
-            spatio (dict): Spatiotemporal metrics dictionary.
-            cycles (dict): Aggregated gait cycles dictionary.
+            spatio (dict): Spatiotemporal statistics containing 'left' and 'right' keys.
+            cycles (dict): Aggregated kinematic cycles containing mean signals for joints.
 
         Returns:
-            dict: Dictionary containing symmetry indices.
+            dict: A dictionary containing symmetry indices and kinematic differences.
         """
         sym_stats = {}
         l_stats = spatio.get('left', {})
         r_stats = spatio.get('right', {})
 
-        # Temporal Symmetry (Time based)
-        for metric in ['stride_time_avg', 'stance_time_avg', 'swing_time_avg']:
-            l_val = l_stats.get(metric, 0)
-            r_val = r_stats.get(metric, 0)
+        # Spatiotemporal Parameters (Standard SI %)
+        # Formula based on Robinson et al. (1987): SI = |L - R| / (0.5 * (L + R)) * 100
+        metrics = [('stride_time_avg', 'stride_time_avg'),
+                   ('stance_time_avg', 'stance_time_avg'),
+                   ('swing_time_avg', 'swing_time_avg')]
 
+        for key, out_key in metrics:
+            l_val, r_val = l_stats.get(key, 0), r_stats.get(key, 0)
             if l_val > 0 and r_val > 0:
-                avg_val = 0.5 * (l_val + r_val)
-                si = (abs(l_val - r_val) / avg_val) * 100
-                sym_stats[metric] = round(si, 2)
+                si = (abs(l_val - r_val) / (0.5 * (l_val + r_val))) * 100
+                sym_stats[out_key] = round(float(si), 2)
             else:
-                sym_stats[metric] = None
+                sym_stats[out_key] = 0.0
 
-        # Kinematic Symmetry
-        rom_symmetry = {}
-        joints_def = [
-            ("Hip", "SHOULDER-HIP-KNEE"),
-            ("Knee", "HIP-KNEE-ANKLE"),
-            ("Ankle", "KNEE-ANKLE-FOOT")
-        ]
+        # Kinematic Detail (Absolute Diffs in degrees + ROM SI)
+        kin_detail = {}
+        joints_def = [("Hip", "SHOULDER-HIP-KNEE"), ("Knee", "HIP-KNEE-ANKLE"), ("Ankle", "KNEE-ANKLE-FOOT")]
 
         for joint_name, keyword in joints_def:
-            # Find matching keys in the cycles dictionary
             l_key = next((k for k in cycles if keyword in k and "LEFT" in k), None)
             r_key = next((k for k in cycles if keyword in k and "RIGHT" in k), None)
 
             if l_key and r_key:
-                l_curve = np.array(cycles[l_key]['mean'])
-                r_curve = np.array(cycles[r_key]['mean'])
+                l_m, r_m = np.array(cycles[l_key]['mean']), np.array(cycles[r_key]['mean'])
 
-                # Calculate Range of Motion (Max - Min)
-                l_rom = np.max(l_curve) - np.min(l_curve)
-                r_rom = np.max(r_curve) - np.min(r_curve)
+                # Difference of cycle means (Absolute shift)
+                mean_diff = abs(np.mean(l_m) - np.mean(r_m))
 
-                if l_rom > 0 and r_rom > 0:
-                    avg_rom = 0.5 * (l_rom + r_rom)
-                    si = (abs(l_rom - r_rom) / avg_rom) * 100
-                    rom_symmetry[joint_name] = round(si, 2)
+                # Min/Max differences
+                min_diff = abs(np.min(l_m) - np.min(r_m))
+                max_diff = abs(np.max(l_m) - np.max(r_m))
 
-        sym_stats['kinematics_rom'] = rom_symmetry
+                # ROM Calculation and ROM SI
+                l_rom, r_rom = np.max(l_m) - np.min(l_m), np.max(r_m) - np.min(r_m)
+                rom_diff = abs(l_rom - r_rom)
+                rom_si = (rom_diff / (0.5 * (l_rom + r_rom))) * 100 if (l_rom + r_rom) > 0 else 0
+
+                kin_detail[joint_name] = {
+                    "mean_diff": round(float(mean_diff), 2),
+                    "min_diff": round(float(min_diff), 2),
+                    "max_diff": round(float(max_diff), 2),
+                    "rom_diff": round(float(rom_diff), 2),
+                    "rom_si": round(float(rom_si), 2)
+                }
+
+        sym_stats['kinematics_detail'] = kin_detail
         return sym_stats
 
     # -------------------------------------------------------------------------
@@ -641,6 +653,56 @@ class GaitAnalyzer:
             "statistics": stats,
             "raw_signal": raw_signal
         }
+
+    # -------------------------------------------------------------------------
+    # COORDINATION LOGIC
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _calc_coordination_metrics(cycles):
+        """
+        Calculates ACC (shape similarity) and Cyclogram Area.
+        Area Symmetry uses Normalized Symmetry Index (NSI) to prevent inflated SI in small joints.
+        Based on Queen et al. (2020).
+        """
+        stats = {}
+        pairs = [("Hip-Knee", ["SHOULDER", "HIP", "KNEE"], ["HIP", "KNEE", "ANKLE"]),
+                 ("Knee-Ankle", ["HIP", "KNEE", "ANKLE"], ["KNEE-ANKLE-FOOT"])]
+
+        def poly_area(x, y):
+            return 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
+
+        def calc_acc(x1, y1, x2, y2):
+            x1_c, y1_c = x1 - np.mean(x1), y1 - np.mean(y1)
+            x2_c, y2_c = x2 - np.mean(x2), y2 - np.mean(y2)
+            num = np.sum(x1_c * x2_c + y1_c * y2_c)
+            den = np.sqrt(np.sum(x1_c ** 2 + y1_c ** 2) * np.sum(x2_c ** 2 + y2_c ** 2))
+            return num / den if den > 0 else 0.0
+
+        for name, kw_x, kw_y in pairs:
+            lx_k = next((k for k in cycles if all(w in k for w in kw_x) and "LEFT" in k), None)
+            ly_k = next((k for k in cycles if all(w in k for w in kw_y) and "LEFT" in k), None)
+            rx_k = next((k for k in cycles if all(w in k for w in kw_x) and "RIGHT" in k), None)
+            ry_k = next((k for k in cycles if all(w in k for w in kw_y) and "RIGHT" in k), None)
+
+            if all([lx_k, ly_k, rx_k, ry_k]):
+                lx, ly = np.array(cycles[lx_k]['mean']), np.array(cycles[ly_k]['mean'])
+                rx, ry = np.array(cycles[rx_k]['mean']), np.array(cycles[ry_k]['mean'])
+
+                area_l, area_r = poly_area(lx, ly), poly_area(rx, ry)
+
+                # NSI Logic: Scales area difference to the combined movement range
+                # instead of just dividing by the mean area.
+                all_x, all_y = np.concatenate([lx, rx]), np.concatenate([ly, ry])
+                total_box_area = (np.max(all_x) - np.min(all_x)) * (np.max(all_y) - np.min(all_y))
+                nsi_area = (abs(area_l - area_r) / total_box_area * 100) if total_box_area > 0 else 0.0
+
+                stats[name] = {
+                    "ACC": float(calc_acc(lx, ly, rx, ry)),
+                    "Area_L": float(area_l), "Area_R": float(area_r),
+                    "Area_Sym": float(nsi_area)
+                }
+        return stats
 
     # --- HELPERS ---
     @staticmethod

@@ -142,6 +142,7 @@
             flex-wrap: wrap;
             gap: 20px;
             margin-bottom: 20px;
+            width: 100%;
         }
 
         .col-100 {
@@ -155,17 +156,26 @@
         }
 
         .col-stats {
-            flex: 0 0 40%;
-            min-width: 350px;
+            flex: 1;
+            min-width: 480px;
+            overflow-x: auto;
         }
 
         .col-graph {
             flex: 1;
-            min-width: 350px;
+            min-width: 400px;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
+
+        .footnote {
+            font-size: 0.8rem;
+            color: #7f8c8d;
+            margin-top: 8px;
+            line-height: 1.4;
+        }
+        .footnote strong { color: #555; }
 
         /* --- METRICS & TABLES --- */
         .metrics-grid {
@@ -374,6 +384,7 @@
                             <th>Metric</th>
                             <th>Left</th>
                             <th>Right</th>
+                            <th style="background:#eee;">Symmetry (SI)</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -381,24 +392,23 @@
                             <td>Stance Time (s)</td>
                             <td>{{ d.spatiotemporal.left.stance_time_avg|fmt(2) }}</td>
                             <td>{{ d.spatiotemporal.right.stance_time_avg|fmt(2) }}</td>
+                            <td class="{{ 'highlight' if d.symmetry_statistics.stance_time_avg > 10 else '' }}">
+                                {{ d.symmetry_statistics.stance_time_avg|fmt(1) }} %
+                            </td>
                         </tr>
                         <tr>
                             <td>Swing Time (s)</td>
                             <td>{{ d.spatiotemporal.left.swing_time_avg|fmt(2) }}</td>
                             <td>{{ d.spatiotemporal.right.swing_time_avg|fmt(2) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Step Count</td>
-                            <td>{{ d.spatiotemporal.left.step_count }}</td>
-                            <td>{{ d.spatiotemporal.right.step_count }}</td>
-                        </tr>
-                        <tr>
-                            <td>Step Length (%LL)</td>
-                            <td>{{ d.spatial.left.step_length_avg_percent|fmt(1) }}</td>
-                            <td>{{ d.spatial.right.step_length_avg_percent|fmt(1) }}</td>
+                            <td class="{{ 'highlight' if d.symmetry_statistics.swing_time_avg > 10 else '' }}">
+                                {{ d.symmetry_statistics.swing_time_avg|fmt(1) }} %
+                            </td>
                         </tr>
                         </tbody>
                     </table>
+                    <div class="footnote">
+                        <strong>* SI (Symmetry Index):</strong> 0% indicates perfect symmetry.
+                    </div>
                 </div>
             </div>
             <div class="row">
@@ -413,21 +423,49 @@
     <!-- SECTION: COORDINATION -->
     <div id="coordination" class="card">
         <h3>Joint Coordination</h3>
-        <div class="row" style="justify-content: center;">
-            {% if 'Hip' in joints and 'Knee' in joints %}
-            <div class="col-graph">
-                <h4>Hip-Knee Cyclogram</h4>
-                {% set hk=img.cyclogram('hip','knee') %}
-                {% if hk %}<img src="{{ hk }}" class="sq-img">{% endif %}
+
+        {% if d.coordination_statistics %}
+        <div class="row" style="margin-bottom: 25px;">
+            <div class="col-100">
+                <h4>Coordination Metrics</h4>
+                <table>
+                    <thead>
+                    <tr>
+                        <th class="text-left">Joint Pair</th>
+                        <th>ACC (Similarity)</th>
+                        <th>Area L (deg²)</th>
+                        <th>Area R (deg²)</th>
+                        <th>Area Symmetry (%)</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for pair_name, stats in d.coordination_statistics.items() %}
+                    <tr>
+                        <td class="text-left" style="font-weight: bold;">{{ pair_name }}</td>
+                        <td class="highlight">{{ stats.ACC|fmt(3) }}</td>
+                        <td>{{ stats.Area_L|fmt(0) }}</td>
+                        <td>{{ stats.Area_R|fmt(0) }}</td>
+                        <td>{{ stats.Area_Sym|fmt(1) }} %</td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <div class="footnote">
+                    <div style="margin-bottom: 4px;"><strong>* ACC (Angular Coefficient of Correspondence):</strong> Measures shape similarity between left and right gait loops. 1.0 indicates an identical pattern.</div>
+                    <div><strong>* Area Symmetry (NSI):</strong> Normalized Symmetry Index. Scales area difference relative to the total joint excursion box for robust symmetry evaluation (Queen et al., 2020).</div>
+                </div>
+        </div>
+        {% endif %}
+
+        <div class="row">
+            <div class="col-50">
+                <h4 style="text-align: center;">Hip-Knee</h4>
+                {% if img.cyclogram('hip','knee') %}<img src="{{ img.cyclogram('hip','knee') }}" class="sq-img">{% endif %}
             </div>
-            {% endif %}
-            {% if 'Knee' in joints and 'Ankle' in joints %}
-            <div class="col-graph">
-                <h4>Knee-Ankle Cyclogram</h4>
-                {% set ka=img.cyclogram('knee','ankle') %}
-                {% if ka %}<img src="{{ ka }}" class="sq-img">{% endif %}
+            <div class="col-50">
+                <h4 style="text-align: center;">Knee-Ankle</h4>
+                {% if img.cyclogram('knee','ankle') %}<img src="{{ img.cyclogram('knee','ankle') }}" class="sq-img">{% endif %}
             </div>
-            {% endif %}
         </div>
     </div>
 
@@ -442,11 +480,17 @@
                 <table>
                     <thead>
                     <tr>
-                        <th>Metric</th>
-                        <th style="background:#d6eaf8; color:#154360;">L Stance</th>
-                        <th style="background:#fadbd8; color:#78281f;">R Stance</th>
-                        <th style="background:#d6eaf8; color:#154360;">L Swing</th>
-                        <th style="background:#fadbd8; color:#78281f;">R Swing</th>
+                        <th rowspan="2" style="vertical-align: middle; border-right: 2px solid #ccc;">Metric</th>
+                        <th colspan="3" style="background:#d6eaf8; color:#154360; text-align: center; border-bottom: 1px solid #a9cce3; border-right: 2px solid #ccc;">Stance Phase</th>
+                        <th colspan="3" style="background:#fadbd8; color:#78281f; text-align: center; border-bottom: 1px solid #f5b7b1;">Swing Phase</th>
+                    </tr>
+                    <tr>
+                        <th style="background:#eaf2f8; color:#154360;">Left</th>
+                        <th style="background:#eaf2f8; color:#154360;">Right</th>
+                        <th style="background:#eee; color:#333; border-right: 2px solid #ccc;">Diff</th>
+                        <th style="background:#fdedec; color:#78281f;">Left</th>
+                        <th style="background:#fdedec; color:#78281f;">Right</th>
+                        <th style="background:#eee; color:#333;">Diff</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -455,40 +499,65 @@
                     {% set lsw = d.detailed_statistics.left.get(joint, {}).get('summary', {}).get('Swing', {}) %}
                     {% set rsw = d.detailed_statistics.right.get(joint, {}).get('summary', {}).get('Swing', {}) %}
 
+                    {% set diff_m_st = ((ls.avg_mean|default(0)|float) - (rs.avg_mean|default(0)|float))|abs %}
+                    {% set diff_m_sw = ((lsw.avg_mean|default(0)|float) - (rsw.avg_mean|default(0)|float))|abs %}
+                    {% set diff_min_st = ((ls.abs_min|default(0)|float) - (rs.abs_min|default(0)|float))|abs %}
+                    {% set diff_min_sw = ((lsw.abs_min|default(0)|float) - (rsw.abs_min|default(0)|float))|abs %}
+                    {% set diff_max_st = ((ls.abs_max|default(0)|float) - (rs.abs_max|default(0)|float))|abs %}
+                    {% set diff_max_sw = ((lsw.abs_max|default(0)|float) - (rsw.abs_max|default(0)|float))|abs %}
+
+                    {% set diff_r_st = ((ls.avg_rom|default(0)|float) - (rs.avg_rom|default(0)|float))|abs %}
+                    {% set sum_r_st = (ls.avg_rom|default(0)|float) + (rs.avg_rom|default(0)|float) %}
+                    {% set si_r_st = (diff_r_st / (0.5 * sum_r_st) * 100) if sum_r_st > 0 else 0 %}
+
+                    {% set diff_r_sw = ((lsw.avg_rom|default(0)|float) - (rsw.avg_rom|default(0)|float))|abs %}
+                    {% set sum_r_sw = (lsw.avg_rom|default(0)|float) + (rsw.avg_rom|default(0)|float) %}
+                    {% set si_r_sw = (diff_r_sw / (0.5 * sum_r_sw) * 100) if sum_r_sw > 0 else 0 %}
+
                     <tr>
-                        <td><strong>Duration (s)</strong></td>
-                        <td style="border-left: 2px solid #eee;">{{ ls.avg_duration|fmt(2) }}</td>
+                        <td style="border-right: 2px solid #ccc;"><strong>Duration (s)</strong></td>
+                        <td>{{ ls.avg_duration|fmt(2) }}</td>
                         <td>{{ rs.avg_duration|fmt(2) }}</td>
-                        <td style="border-left: 2px solid #eee;">{{ lsw.avg_duration|fmt(2) }}</td>
+                        <td style="color:#999; background:#f9f9f9; border-right: 2px solid #ccc;">-</td>
+                        <td>{{ lsw.avg_duration|fmt(2) }}</td>
                         <td>{{ rsw.avg_duration|fmt(2) }}</td>
+                        <td style="color:#999; background:#f9f9f9;">-</td>
                     </tr>
                     <tr>
-                        <td><strong>Mean (°)</strong></td>
-                        <td style="border-left: 2px solid #eee;">{{ ls.avg_mean|fmt(1) }}</td>
+                        <td style="border-right: 2px solid #ccc;"><strong>Mean (°)</strong></td>
+                        <td>{{ ls.avg_mean|fmt(1) }}</td>
                         <td>{{ rs.avg_mean|fmt(1) }}</td>
-                        <td style="border-left: 2px solid #eee;">{{ lsw.avg_mean|fmt(1) }}</td>
+                        <td style="font-weight:bold; background:#f9f9f9; border-right: 2px solid #ccc;">{{ diff_m_st|fmt(1) }}°</td>
+                        <td>{{ lsw.avg_mean|fmt(1) }}</td>
                         <td>{{ rsw.avg_mean|fmt(1) }}</td>
+                        <td style="font-weight:bold; background:#f9f9f9;">{{ diff_m_sw|fmt(1) }}°</td>
                     </tr>
                     <tr>
-                        <td>Range (ROM)</td>
-                        <td style="border-left: 2px solid #eee;">{{ ls.avg_rom|fmt(1) }}</td>
+                        <td style="border-right: 2px solid #ccc;">Range (ROM)</td>
+                        <td>{{ ls.avg_rom|fmt(1) }}</td>
                         <td>{{ rs.avg_rom|fmt(1) }}</td>
-                        <td style="border-left: 2px solid #eee;">{{ lsw.avg_rom|fmt(1) }}</td>
+                        <td class="highlight" style="background:#f9f9f9; border-right: 2px solid #ccc;">{{ diff_r_st|fmt(1) }}° ({{ si_r_st|fmt(1) }}%)</td>
+                        <td>{{ lsw.avg_rom|fmt(1) }}</td>
                         <td>{{ rsw.avg_rom|fmt(1) }}</td>
+                        <td class="highlight" style="background:#f9f9f9;">{{ diff_r_sw|fmt(1) }}° ({{ si_r_sw|fmt(1) }}%)</td>
                     </tr>
                     <tr>
-                        <td>Min (°)</td>
-                        <td style="border-left: 2px solid #eee;">{{ ls.abs_min|fmt(0) }}</td>
+                        <td style="border-right: 2px solid #ccc;">Min (°)</td>
+                        <td>{{ ls.abs_min|fmt(0) }}</td>
                         <td>{{ rs.abs_min|fmt(0) }}</td>
-                        <td style="border-left: 2px solid #eee;">{{ lsw.abs_min|fmt(0) }}</td>
+                        <td style="font-weight:bold; background:#f9f9f9; border-right: 2px solid #ccc;">{{ diff_min_st|fmt(1) }}°</td>
+                        <td>{{ lsw.abs_min|fmt(0) }}</td>
                         <td>{{ rsw.abs_min|fmt(0) }}</td>
+                        <td style="font-weight:bold; background:#f9f9f9;">{{ diff_min_sw|fmt(1) }}°</td>
                     </tr>
                     <tr>
-                        <td>Max (°)</td>
-                        <td style="border-left: 2px solid #eee;">{{ ls.abs_max|fmt(0) }}</td>
+                        <td style="border-right: 2px solid #ccc;">Max (°)</td>
+                        <td>{{ ls.abs_max|fmt(0) }}</td>
                         <td>{{ rs.abs_max|fmt(0) }}</td>
-                        <td style="border-left: 2px solid #eee;">{{ lsw.abs_max|fmt(0) }}</td>
+                        <td style="font-weight:bold; background:#f9f9f9; border-right: 2px solid #ccc;">{{ diff_max_st|fmt(1) }}°</td>
+                        <td>{{ lsw.abs_max|fmt(0) }}</td>
                         <td>{{ rsw.abs_max|fmt(0) }}</td>
+                        <td style="font-weight:bold; background:#f9f9f9;">{{ diff_max_sw|fmt(1) }}°</td>
                     </tr>
                     </tbody>
                 </table>
