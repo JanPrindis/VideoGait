@@ -858,7 +858,21 @@
     }
 
     function scrollToId(id) {
-        document.getElementById(id).scrollIntoView({behavior: 'smooth'});
+        const element = document.getElementById(id);
+        const panel = document.getElementById('video-panel');
+        const container = document.querySelector('.main-content');
+
+        if (element && container) {
+            const panelHeight = panel ? panel.offsetHeight : 0;
+            const elementPos = element.getBoundingClientRect().top;
+            const containerPos = container.getBoundingClientRect().top;
+            const offsetPosition = elementPos - containerPos + container.scrollTop - panelHeight - 20;
+
+            container.scrollTo({
+                top: offsetPosition,
+                behavior: 'smooth'
+            });
+        }
     }
 
     // --- PLOTTING FUNCTIONS ---
