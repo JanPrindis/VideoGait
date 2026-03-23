@@ -62,7 +62,9 @@ class HeuristicConfig(BaseModel):
     method: str
     skeleton: Optional[str] = None
     seed: Optional[int] = 3
-    train_split: Optional[float] = 0.8
+    train_split: Optional[float] = 0.6
+    val_split: Optional[float] = 0.2
+    test_split: Optional[float] = 0.2
     params: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -218,7 +220,9 @@ class TrainDataConfig(BaseModel):
     framerate: float = 60.0
     skeleton: str
     requires_adj_matrix: bool = False
-    train_split: float = 0.8
+    train_split: float = 0.6
+    val_split: float = 0.2
+    test_split: float = 0.2
     num_workers: int = 0
     features: TrainFeaturesConfig
 

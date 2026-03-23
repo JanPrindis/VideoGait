@@ -29,7 +29,9 @@ event_detector:
     method: "Zeni"
     skeleton: "HALPE"
     seed: 3
-    train_split: 0.8
+    train_split: 0.6
+    val_split: 0.2
+    test_split: 0.2
     params:
       min_peak_distance: 20
       prominence: 10

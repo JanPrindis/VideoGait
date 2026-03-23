@@ -296,7 +296,12 @@ def run_nn_inference(
     # Override the skeleton with detector's skeleton to allow cross skeleton detection
     # This ensures we parse the keypoint JSON using the indices of the actual detector
     # Missing features will be zero-padded
-    detector_skeleton = resolve_skeleton_from_config(app_config)
+    try:
+        detector_skeleton = resolve_skeleton_from_config(app_config)
+    except ValueError:
+        # Fallback for benchmarking where app_config is mocked and has no valid pose detector
+        detector_skeleton = resolve_skeleton_from_config(train_cfg)
+
     preprocess_args["skeleton_definition"] = detector_skeleton
 
     preprocess_args["confidence_threshold"] = app_config.preprocessing.confidence_threshold

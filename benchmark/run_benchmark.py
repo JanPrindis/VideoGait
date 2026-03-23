@@ -13,6 +13,7 @@ Usage:
 import argparse
 import os
 import sys
+import json
 
 # Path hack
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../"))
@@ -87,6 +88,56 @@ def run_benchmark():
 
     # Get Data (Files + resolved FPS)
     test_files, global_fps = get_benchmark_files(cfg)
+
+    # --- TEST SET FILTERING ---
+    # If not using full dataset, strictly filter only 'test' files from dataset_splits.json
+    if not cfg.data.use_full_dataset:
+        exp_path = None
+        if cfg.event_detector.neural_net and cfg.event_detector.neural_net.experiment_path:
+            exp_path = os.path.join(PROJECT_ROOT, cfg.event_detector.neural_net.experiment_path)
+
+        splits_file = os.path.join(exp_path, "dataset_splits.json") if exp_path else None
+
+        if splits_file and os.path.exists(splits_file):
+            log("BENCHMARK", f"Loading test split from {splits_file}", level="info")
+            with open(splits_file, "r") as f:
+                splits = json.load(f)
+
+            # Map to absolute paths for robust comparison
+            abs_test_kps = set(os.path.abspath(os.path.join(PROJECT_ROOT, p)) for p in splits.get("test", []))
+
+            filtered_files = []
+            for item in test_files:
+                abs_item_kp = os.path.abspath(item['kp'])
+                if abs_item_kp in abs_test_kps:
+                    filtered_files.append(item)
+
+            test_files = filtered_files
+            log("BENCHMARK", f"Filtered dataset using splits JSON. Test files: {len(test_files)}", level="info")
+
+        # Fallback - if split JSON is missing, use heuristic seed
+        elif cfg.event_detector.method == "Heuristic" and cfg.event_detector.heuristic:
+            log("BENCHMARK", "No dataset_splits.json found. Recreating split using Heuristic seed...", level="warning")
+            import random
+
+            test_files.sort(key=lambda x: x['kp'])
+
+            heur_cfg = cfg.event_detector.heuristic
+            random.seed(heur_cfg.seed)
+            random.shuffle(test_files)
+
+            total_files = len(test_files)
+            train_idx = int(total_files * heur_cfg.train_split)
+            val_idx = train_idx + int(total_files * heur_cfg.val_split)
+
+            test_files = test_files[val_idx:]
+            log("BENCHMARK", f"Filtered dataset using internal seed ({heur_cfg.seed}). Test files: {len(test_files)}", level="info")
+
+        else:
+            log("BENCHMARK", "use_full_dataset is False, but dataset_splits.json not found! Using fallback files.", level="warning")
+
+    if args.debug:
+        log("BENCHMARK", f"Files evaluated in this run: {[item['name'] for item in test_files]}", level="info")
 
     # Setup Wrapper
     method = cfg.event_detector.method
@@ -448,6 +499,7 @@ def run_benchmark():
     log("BENCHMARK", f"All results saved to: {out_dir}", level="success")
     log("BENCHMARK", f" - Reliability calculated with STRICT ({strict_tolerance_ms}ms) tolerance.", level="info")
     log("BENCHMARK", f" - Plots generated with LOOSE ({loose_tolerance_ms}ms) data.", level="info")
+    return None
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
-experiment_name: "Benchmark_BiLSTM_RTMLIB"
-output_dir: "benchmarkResults/BiLSTM_RTMLIB"
+experiment_name: "Benchmark_BiLSTM"
+output_dir: "benchmarkResults/BiLSTM"
 
 preprocessing:
   framerate: 60
@@ -18,7 +18,7 @@ event_detector:
   method: "NeuralNet"
 
   neural_net:
-    experiment_path: "experiments/BiLSTM_RTMLIB"
+    experiment_path: "experiments/BiLSTM"
     checkpoint: "best_model.pth"
 
     post_processing:

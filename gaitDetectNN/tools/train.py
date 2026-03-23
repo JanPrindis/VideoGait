@@ -176,6 +176,7 @@ def main():
     """
     parser = argparse.ArgumentParser(description="Gait Detection Training Script")
     parser.add_argument("--config", required=True, help="Path to the YAML config file")
+    parser.add_argument("--debug", action='store_true', help="Enable debug outputs (e.g. lists of dataset files)")
     args = parser.parse_args()
 
     # SETUP OUTPUT DIRECTORY
@@ -227,10 +228,29 @@ def main():
 
     # Shuffle & Split
     random.shuffle(file_paths)
-    split_ratio = cfg.data.train_split
-    split_idx = int(len(file_paths) * split_ratio)
-    train_paths = file_paths[:split_idx]
-    val_paths = file_paths[split_idx:]
+    total_files = len(file_paths)
+    train_idx = int(total_files * cfg.data.train_split)
+    val_idx = train_idx + int(total_files * cfg.data.val_split)
+
+    train_paths = file_paths[:train_idx]
+    val_paths = file_paths[train_idx:val_idx]
+    test_paths = file_paths[val_idx:]
+
+    log("TRAIN", f"Splits -> Train: {len(train_paths)} | Val: {len(val_paths)} | Test: {len(test_paths)}", level="info")
+
+    if args.debug:
+        log("TRAIN", f"Train files: {[os.path.basename(kp) for kp, _ in train_paths]}", level="info")
+        log("TRAIN", f"Val files: {[os.path.basename(kp) for kp, _ in val_paths]}", level="info")
+        log("TRAIN", f"Test files: {[os.path.basename(kp) for kp, _ in test_paths]}", level="info")
+
+    # Save split definitions for benchmarking
+    splits_dict = {
+        "train": [kp for kp, ann in train_paths],
+        "val": [kp for kp, ann in val_paths],
+        "test": [kp for kp, ann in test_paths]
+    }
+    with open(os.path.join(output_dir, "dataset_splits.json"), "w") as f:
+        json.dump(splits_dict, f, indent=4)
 
     # Preprocessing Config
     preprocess_args = build_preprocess_args_from_train_config(cfg)

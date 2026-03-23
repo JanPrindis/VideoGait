@@ -65,8 +65,6 @@ def get_data_settings(cfg: BenchmarkConfig):
         train_cfg: TrainConfig = load_and_validate_yaml(train_cfg_path, TrainConfig)
 
         settings["framerate"] = train_cfg.data.framerate
-        settings["seed"] = train_cfg.training.seed
-        settings["split_ratio"] = train_cfg.data.train_split
 
     # For heuristic methods, pull the config from the config file
     elif method == "Heuristic":
@@ -74,8 +72,6 @@ def get_data_settings(cfg: BenchmarkConfig):
         log("DATA", "Using explicit settings from Heuristic config.", level="info")
 
         settings["framerate"] = cfg.preprocessing.framerate
-        settings["seed"] = heuristics_cfg.seed
-        settings["split_ratio"] = heuristics_cfg.train_split
 
     return settings
 
@@ -114,32 +110,5 @@ def get_benchmark_files(cfg: BenchmarkConfig):
         if ann and os.path.exists(ann):
             paired_files.append({"kp": kp, "ann": ann, "name": os.path.basename(kp)})
 
-    log("DATA", f"Found {len(paired_files)} valid pairs.", level="success")
-
-    # If using the full dataset, return
-    if settings["use_full"]:
-        log("DATA", "Using FULL dataset.", level="warning")
-        return paired_files, settings["framerate"]
-
-    # Otherwise replicate the training/validation split
-    seed = settings["seed"]
-    ratio = settings["split_ratio"]
-
-    random.seed(seed)
-    random.shuffle(paired_files)
-
-    split_idx = int(len(paired_files) * ratio)
-
-    # First part is Training, second is Validation
-    test_files = paired_files[split_idx:]
-
-
-    for file in test_files:
-        log("DATA", f"Filtered file: {file['name']}", level="info")
-
-
-    log("DATA", f"Using VALIDATION split (Seed: {seed}, Ratio: {ratio})", level="info")
-    log("DATA", f"       -> Train set (ignored): {split_idx}", level="info")
-    log("DATA", f"       -> Test set (used):     {len(test_files)}", level="info")
-
-    return test_files, settings["framerate"]
+    log("DATA", f"Found {len(paired_files)} valid total pairs across dataset.", level="success")
+    return paired_files, settings["framerate"]

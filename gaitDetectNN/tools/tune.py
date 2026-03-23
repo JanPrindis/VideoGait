@@ -254,9 +254,13 @@ def main():
     # Shuffle & Split
     random.seed(cfg.training.seed)
     random.shuffle(file_paths)
-    split_idx = int(len(file_paths) * cfg.data.train_split)
-    train_paths = file_paths[:split_idx]
-    val_paths = file_paths[split_idx:]
+    total_files = len(file_paths)
+    train_idx = int(total_files * cfg.data.train_split)
+    val_idx = train_idx + int(total_files * cfg.data.val_split)
+
+    train_paths = file_paths[:train_idx]
+    val_paths = file_paths[train_idx:val_idx]
+    # test_paths is strictly ignored during tuning to prevent data leakage!
 
     # Preprocessing Config
     preprocess_args = build_preprocess_args_from_train_config(cfg)

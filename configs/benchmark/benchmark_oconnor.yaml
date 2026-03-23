@@ -1,5 +1,5 @@
-experiment_name: "Benchmark_OConnor_Baseline_1"
-output_dir: "benchmarkResults/oconnor_001"
+experiment_name: "Benchmark_OConnor"
+output_dir: "benchmarkResults/oconnor"
 
 preprocessing:
   framerate: 60
@@ -29,7 +29,9 @@ event_detector:
     method: "OConnor"
     skeleton: "HALPE"
     seed: 3
-    train_split: 0.8
+    train_split: 0.6
+    val_split: 0.2
+    test_split: 0.2
     params:
       velocity_filter_order: 9
       velocity_filter_cutoff: 3.0

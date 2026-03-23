@@ -1,19 +1,14 @@
-PD_006_MD.json
-PD_003_ML.json
-KOA_009_EL.json
-KOA_010_SV.json
-NM_021.json
-KOA_012_EL.json
-PD_004_MD.json
-KOA_001_MD.json
-PD_004_ML.json
-KOA_003_SV.json
-NM_025.json
-PD_001_MD.json
-NM_011.json
-NM_028.json
-KOA_018_MD.json
-KOA_006_MD.json
-NM_020.json
-NM_026.json
-KOA_011_EL.json
+Train files:
+['KOA_014_MD.json', 'KOA_005_SV.json', 'NM_014.json', 'KOA_008_MD.json', 'NM_008.json', 'PD_005_MD.json', 'KOA_006_EL.json', 'NM_006.json', 'KOA_005_EL.json', 'NM_007.json', 'PD_003_MD.json', 'KOA_002_MD.json', 'KOA_004_EL.json', 'NM_030.json', 'KOA_015_SV.json', 'KOA_014_SV.json',
+'KOA_002_EL.json', 'KOA_015_EL.json', 'KOA_002_SV.json', 'KOA_012_MD.json', 'KOA_014_EL.json', 'KOA_001_EL.json', 'KOA_008_EL.json', 'KOA_004_MD.json', 'KOA_003_MD.json', 'KOA_012_SV.json', 'NM_023.json', 'NM_004_02.json', 'NM_005.json', 'KOA_004_SV.json', 'KOA_007_EL.json', 'NM_022.json', 'KOA_011_SV.json',
+'KOA_009_SV.json', 'NM_009.json', 'NM_013.json', 'PD_005_ML.json', 'KOA_005_MD.json', 'KOA_011_MD.json', 'KOA_015_MD.json', 'NM_010.json', 'KOA_003_EL.json', 'KOA_008_SV.json', 'NM_015_01.json', 'KOA_010_MD.json', 'KOA_013_EL.json', 'NM_002_02.json', 'KOA_009_MD.json', 'KOA_010_EL.json', 'KOA_016_MD.json',
+'NM_027.json', 'KOA_017_MD.json', 'KOA_013_SV.json', 'PD_007_MD.json', 'KOA_006_SV.json']
+
+Val files:
+['NM_003.json', 'NM_016.json', 'NM_018.json', 'NM_019.json', 'KOA_001_SV.json', 'KOA_013_MD.json', 'NM_012.json', 'KOA_019_MD.json', 'KOA_007_SV.json', 'PD_002_ML.json', 'PD_001_ML.json', 'KOA_020_MD.json', 'NM_017.json', 'NM_024.json', 'PD_002_MD.json', 'KOA_007_MD.json', 'NM_001.json',
+'PD_006_ML.json']
+
+Test files:
+['NM_029.json', 'PD_006_MD.json', 'PD_003_ML.json', 'KOA_009_EL.json', 'KOA_010_SV.json', 'NM_021.json', 'KOA_012_EL.json', 'PD_004_MD.json', 'KOA_001_MD.json', 'PD_004_ML.json', 'KOA_003_SV.json', 'NM_025.json', 'PD_001_MD.json', 'NM_011.json', 'NM_028.json', 'KOA_018_MD.json',
+'KOA_006_MD.json', 'NM_020.json', 'NM_026.json', 'KOA_011_EL.json']
+[PREPROCESS] KOA_014_MD.json resulted in 2 clips!

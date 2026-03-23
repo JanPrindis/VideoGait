@@ -1,5 +1,5 @@
-experiment_name: "Benchmark_Bonci_Baseline_1"
-output_dir: "benchmarkResults/bonci_001"
+experiment_name: "Benchmark_Bonci"
+output_dir: "benchmarkResults/bonci"
 
 preprocessing:
   framerate: 60
@@ -17,19 +17,13 @@ preprocessing:
 event_detector:
   method: "Heuristic" # "NeuralNet" or "Heuristic"
 
-  neural_net:
-    experiment_path: "experiments/LSTM_Baseline_Halpe"
-    checkpoint: "best_model.pth"
-
-    post_processing:
-      threshold: 0.6
-      min_distance_sec: 0.25
-
   heuristic:
     method: "Bonci"
     skeleton: "HALPE"
     seed: 3
-    train_split: 0.8
+    train_split: 0.6
+    val_split: 0.2
+    test_split: 0.2
     params:
       hs_velocity_factor: 0.5
       to_velocity_factor: 0.8

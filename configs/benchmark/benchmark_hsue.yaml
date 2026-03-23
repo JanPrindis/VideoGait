@@ -1,5 +1,5 @@
-experiment_name: "Benchmark_Hsue_Baseline_1"
-output_dir: "benchmarkResults/hsue_001"
+experiment_name: "Benchmark_Hsue"
+output_dir: "benchmarkResults/hsue"
 
 preprocessing:
   framerate: 60
@@ -29,7 +29,9 @@ event_detector:
     method: "Hsue"
     skeleton: "HALPE"
     seed: 3
-    train_split: 0.8
+    train_split: 0.6
+    val_split: 0.2
+    test_split: 0.2
     params:
       # Peak detection parameters
       min_peak_distance: 20

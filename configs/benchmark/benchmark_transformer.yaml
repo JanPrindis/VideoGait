@@ -18,7 +18,7 @@ event_detector:
   method: "NeuralNet"
 
   neural_net:
-    experiment_path: "experiments/Transformer_RTMLIB"
+    experiment_path: "experiments/Transformer"
     checkpoint: "best_model.pth"
 
     post_processing:
