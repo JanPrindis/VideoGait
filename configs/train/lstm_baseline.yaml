@@ -80,3 +80,4 @@ training:
   batch_size: 64
   epochs: 100
   seed: 3               # Training/Validation split seed
+  noise_std: 0.05       # Data augmentation noise

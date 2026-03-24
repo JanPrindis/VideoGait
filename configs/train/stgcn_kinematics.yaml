@@ -60,21 +60,22 @@ model:
   type: "GaitSTGCN"
   params:
       tcn_kernel_size: 21
-      hidden_channels: 64
-      num_layers: 7
-      dropout: 0.1
+      hidden_channels: 128
+      num_layers: 3
+      dropout: 0.21
       num_classes: 4
       graph_strategy: uniform # Uniform | Spacial
 
 training:
   optimizer: "AdamW"
   f1_window_size_ms: 50
-  learning_rate: 0.00442
-  weight_decay: 0.00007
+  learning_rate: 0.00368
+  weight_decay: 0.00004
   momentum: 0.9
   batch_size: 16
   epochs: 100
   seed: 3               # Training/Validation split seed
+  noise_std: 0.05       # Data augmentation noise
 
   # Optional scheduler config
   scheduler: "OneCycleLR"

@@ -66,21 +66,22 @@ data:
 model:
   type: "GaitBiLSTM"
   params:
-    num_layers: 2
+    num_layers: 3
     hidden_dim: 512
-    dense_units: 32
-    dropout: 0.28
+    dense_units: 128
+    dropout: 0.58
     num_classes: 4
 
 training:
   optimizer: "AdamW"
   f1_window_size_ms: 50
-  learning_rate: 0.0014
-  weight_decay: 0.00008
+  learning_rate: 0.00094
+  weight_decay: 0.0042
   momentum: 0.9
   batch_size: 16
   epochs: 100
   seed: 3               # Training/Validation split seed
+  noise_std: 0.05       # Data augmentation noise
 
   scheduler: "OneCycleLR"
   scheduler_config:
