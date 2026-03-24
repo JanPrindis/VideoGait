@@ -31,16 +31,14 @@ from utils.logger import log
 
 def set_seed(seed):
     """
-    Sets the random seed for reproducibility across Python, NumPy, and PyTorch.
+    Sets the random seed for dataset splitting reproducibility.
+    PyTorch is intentionally left unseeded to allow variance between training runs.
 
     Args:
         seed (int): The seed value to use.
     """
     random.seed(seed)
     np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
 
 
 def build_optimizer(model, training_cfg: TrainingParams):
@@ -127,7 +125,7 @@ def plot_training_curves(history, output_dir):
     # Mark minimal loss
     min_loss_idx = np.argmin(history['val_loss'])
     min_loss_val = history['val_loss'][min_loss_idx]
-    axs[0].scatter(min_loss_idx + 1, min_loss_val, color='cyan', s=100, zorder=5, label='Min Loss')
+    axs[0].scatter(min_loss_idx + 1, min_loss_val, color='red', s=150, zorder=5, label='Best Checkpoint (Saved)')
 
     axs[0].set_ylabel('BCE Loss (Weighted)')
     axs[0].set_title(f'Loss Curve (Min Val: {min_loss_val:.4f} at Ep {min_loss_idx + 1})')
@@ -138,15 +136,14 @@ def plot_training_curves(history, output_dir):
     axs[1].plot(epochs, history['train_f1'], label='Train F1', color='green', linestyle='--')
     axs[1].plot(epochs, history['val_f1'], label='Val F1', color='green', linewidth=2)
 
-    # Mark max F1 score
-    best_f1_idx = np.argmax(history['val_f1'])
-    best_f1_val = history['val_f1'][best_f1_idx]
+    # Mark saved F1 score (which corresponds to the min loss epoch)
+    saved_f1_val = history['val_f1'][min_loss_idx]
 
-    # Red dot marks saved model
-    axs[1].scatter(best_f1_idx + 1, best_f1_val, color='red', s=150, zorder=5, label='Best Checkpoint (Saved)')
+    # Mark saved F1 score
+    axs[1].scatter(min_loss_idx + 1, saved_f1_val, color='red', s=150, zorder=5, label='Saved F1')
 
     axs[1].set_ylabel('F1 Score')
-    axs[1].set_title(f'F1 Score (Max Val: {best_f1_val:.4f} at Ep {best_f1_idx + 1})')
+    axs[1].set_title(f'F1 Score (Saved Val: {saved_f1_val:.4f} at Ep {min_loss_idx + 1})')
     axs[1].grid(True, alpha=0.3)
     axs[1].legend()
 
@@ -312,7 +309,11 @@ def main():
     model_save_path = os.path.join(output_dir, "best_model.pth")
     num_epochs = cfg.training.epochs
 
-    trainer = Trainer(model, train_loader, val_loader, criterion, optimizer, scheduler, device, tolerance_frames)
+    trainer = Trainer(
+        model, train_loader, val_loader, criterion, 
+        optimizer, scheduler, device, tolerance_frames,
+        noise_std=cfg.training.noise_std
+    )
 
     # Run training
     history = trainer.fit(num_epochs=num_epochs, save_path=model_save_path)

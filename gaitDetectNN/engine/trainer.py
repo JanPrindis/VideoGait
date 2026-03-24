@@ -7,7 +7,7 @@ from utils.logger import log
 
 
 class Trainer:
-    def __init__(self, model, train_loader, val_loader, criterion, optimizer, scheduler, device, f1_tolerance_frames):
+    def __init__(self, model, train_loader, val_loader, criterion, optimizer, scheduler, device, f1_tolerance_frames, noise_std=0.0):
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -19,11 +19,12 @@ class Trainer:
             'train_loss': [], 'val_loss': [],
             'train_f1': [], 'val_f1': []
         }
+        self.noise_std = noise_std
 
         # Hybrid saving state
         self.f1_tolerance_frames = f1_tolerance_frames
-        self.best_val_f1 = -1.0             # We are maximizing F1 score
-        self.best_val_loss = float('inf')   # We are minimizing loss if F1 score stays the same
+        self.best_val_loss = float('inf')   # We are minimizing validation loss
+        self.best_val_f1 = -1.0             # Tie-breaker: Maximize F1 if loss is identical
         self.best_model_state = copy.deepcopy(self.model.state_dict())
 
     def _create_mask(self, lengths: torch.Tensor, max_len: int) -> torch.Tensor:
@@ -134,6 +135,11 @@ class Trainer:
         for features, labels, lengths in self.train_loader:
             features, labels, lengths = features.to(self.device), labels.to(self.device), lengths.to(self.device)
 
+            # --- DATA AUGMENTATION ---
+            if self.noise_std > 0.0:
+                noise = torch.randn_like(features) * self.noise_std
+                features = features + noise
+
             self.optimizer.zero_grad()
             logits = self.model(features, lengths.cpu())
 
@@ -198,16 +204,16 @@ class Trainer:
                 is_best = False
                 reason = ""
 
-                # if F1 score is higher -> save
-                if val_f1 > self.best_val_f1:
+                # if Loss is lower -> save
+                if val_loss < self.best_val_loss:
                     is_best = True
-                    reason = f"New Best F1 ({val_f1:.4f})"
+                    reason = f"New Best Loss ({val_loss:.4f})"
 
-                # if F1 score stays the same, but the loss is lower -> save
-                elif val_f1 == self.best_val_f1:
-                    if val_loss < self.best_val_loss:
+                # if Loss stays the same, but F1 is higher -> save
+                elif val_loss == self.best_val_loss:
+                    if val_f1 > self.best_val_f1:
                         is_best = True
-                        reason = f"Tie-break: Lower Loss ({val_loss:.4f})"
+                        reason = f"Tie-break: Higher F1 ({val_f1:.4f})"
 
                 if is_best:
                     self.best_val_f1 = val_f1
@@ -225,10 +231,10 @@ class Trainer:
             raise
 
         finally:
-            if self.best_val_f1 == -1.0:
+            if self.best_val_loss == float('inf'):
                 log("TRAINER", "No best model to save.", level="warning")
             else:
-                log("TRAINER", f"Loading best model (F1: {self.best_val_f1:.4f}, Loss: {self.best_val_loss:.4f})", level="info")
+                log("TRAINER", f"Loading best model (Loss: {self.best_val_loss:.4f}, F1: {self.best_val_f1:.4f})", level="info")
                 self.model.load_state_dict(self.best_model_state)
 
                 if save_path:

@@ -252,6 +252,7 @@ class TrainingParams(BaseModel):
     momentum: Optional[float] = None
     f1_window_size_ms: Optional[int] = 50
     seed: Optional[int] = 3
+    noise_std: Optional[float] = 0.0
 
     scheduler: Optional[str] = None
     scheduler_config: Dict[str, Any] = Field(default_factory=dict)

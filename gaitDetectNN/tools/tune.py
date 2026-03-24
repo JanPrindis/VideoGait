@@ -32,104 +32,158 @@ from utils.config_utils import load_and_validate_yaml, build_preprocess_args_fro
 # ==============================================================================
 
 def suggest_bilstm_params(trial):
-    return {
-        # Architecture
-        "hidden_dim": trial.suggest_categorical("hidden_dim", [256, 512, 768]),
-        # "hidden_dim": trial.suggest_categorical("hidden_dim", [128, 256, 512]),
-        "num_layers": trial.suggest_int("num_layers", 1, 3),
-        "dropout": trial.suggest_float("dropout", 0.2, 0.6),
-        "dense_units": trial.suggest_categorical("dense_units", [32, 64, 128]),
+    # --- PHASE 1: COARSE SEARCH ---
+    # "hidden_dim": trial.suggest_categorical("hidden_dim", [64, 128, 256, 512]),
+    # "num_layers": trial.suggest_int("num_layers", 1, 3),
+    # "dense_units": trial.suggest_categorical("dense_units", [32, 64, 128]),
+    # "dropout": trial.suggest_float("dropout", 0.1, 0.7),
+    # "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
+    # "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
+    # ----------------------------------------------
 
-        # Training
-        "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
-        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
+    # --- PHASE 2: FINE-TUNING ---
+    return {
+        "hidden_dim": 512,
+        "num_layers": 3,
+        "dense_units": 128,
+
+        "dropout": trial.suggest_float("dropout", 0.4, 0.6),
+        "lr": trial.suggest_float("lr", 5e-4, 1e-3, log=True),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-3, 1e-2, log=True)
     }
 
 def suggest_gru_params(trial):
-    return {
-        # Architecture
-        # "hidden_dim": trial.suggest_categorical("hidden_dim", [128, 256]),
-        "hidden_dim": trial.suggest_categorical("hidden_dim", [256, 512, 768]),
-        "num_layers": trial.suggest_int("num_layers", 1, 3),
-        # "dropout": trial.suggest_float("dropout", 0.1, 0.4),
-        "dropout": trial.suggest_float("dropout", 0.12, 0.5),
-        "dense_units": trial.suggest_categorical("dense_units", [32, 64, 128]),
+    # --- PHASE 1: COARSE SEARCH ---
+    # "hidden_dim": trial.suggest_categorical("hidden_dim", [64, 128, 256, 512]),
+    # "num_layers": trial.suggest_int("num_layers", 1, 3),
+    # "dense_units": trial.suggest_categorical("dense_units", [32, 64, 128]),
+    # "dropout": trial.suggest_float("dropout", 0.1, 0.7),
+    # "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
+    # "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
+    # ----------------------------------------------
 
-        # Training
-        # "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
-        "lr": trial.suggest_float("lr", 1e-4, 2e-3, log=True),
-        "weight_decay": trial.suggest_float("weight_decay", 1e-6, 1e-3, log=True)
+    # --- PHASE 2: FINE-TUNING ---
+    return {
+        "hidden_dim": 512,
+        "num_layers": 3,
+        "dense_units": 128,
+
+        "dropout": trial.suggest_float("dropout", 0.2, 0.5),
+        "lr": trial.suggest_float("lr", 2e-4, 8e-4, log=True),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-4, log=True)
     }
 
 def suggest_tcn_params(trial):
-    # Layer calculation
-    num_layers = trial.suggest_int("num_layers", 2, 5)
-    channel_size = trial.suggest_categorical("channel_size", [64, 128, 256, 512])
-    # channel_size = trial.suggest_categorical("channel_size", [128, 256, 512])
+    # --- PHASE 1: COARSE SEARCH ---
+    # num_layers = trial.suggest_int("num_layers", 2, 6)
+    # channel_size = trial.suggest_categorical("channel_size", [32, 64, 128, 256])
+    # num_channels = [channel_size] * num_layers
+    # return {
+    #     "num_channels": num_channels,
+    #     "kernel_size": trial.suggest_categorical("kernel_size", [3, 5, 7, 9, 11]),
+    #     "dropout": trial.suggest_float("dropout", 0.1, 0.6),
+    #     "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
+    #     "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
+    # }
+    # ----------------------------------------------
 
-    # Create a list of channels, for example [64, 64, 64]
+    # --- PHASE 2: FINE-TUNING ---
+    num_layers = 6
+    channel_size = 128
     num_channels = [channel_size] * num_layers
 
     return {
-        # Architecture
         "num_channels": num_channels,
-        "kernel_size": trial.suggest_categorical("kernel_size", [5, 7, 9, 11]),
-        "dropout": trial.suggest_float("dropout", 0.1, 0.4),
+        "kernel_size": 11,
 
-        # Training
-        "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
-        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
+        "dropout": trial.suggest_float("dropout", 0.1, 0.4),
+        "lr": trial.suggest_float("lr", 2e-3, 5e-3, log=True),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 2e-4, log=True)
     }
 
 def suggest_transformer_params(trial):
-    # Get model width (d_model)
-    d_model = trial.suggest_categorical("d_model", [32, 64])
+    # --- PHASE 1: COARSE SEARC ---
+    # "d_model": trial.suggest_categorical("d_model", [16, 32, 64, 128]),
+    # "num_layers": trial.suggest_int("num_layers", 1, 4),
+    # "dim_feedforward": trial.suggest_categorical("dim_feedforward", [32, 64, 128, 256]),
+    # "kernel_size": trial.suggest_categorical("kernel_size", [3, 5, 9, 15]),
+    # "dropout": trial.suggest_float("dropout", 0.1, 0.6),
+    # "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
+    # "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
+    # ----------------------------------------------
 
-    # Pick number of heads based on model width
-    if d_model == 64:
-        n_head = trial.suggest_categorical("n_head_64", [2, 4])
-    elif d_model == 128:
-        n_head = trial.suggest_categorical("n_head_128", [2, 4, 8])
-    else:  # 256
-        n_head = trial.suggest_categorical("n_head_256", [4, 8])
+    # --- PHASE 1.1: SHIFTED COARSE SEARCH ---
+    # "d_model": trial.suggest_categorical("d_model", [128, 256]),
+    # "num_layers": trial.suggest_int("num_layers", 2, 4),
+    # "dim_feedforward": trial.suggest_categorical("dim_feedforward", [128, 256, 512]),
+    # "kernel_size": trial.suggest_categorical("kernel_size", [11, 15, 21, 31]),
+    # "dropout": trial.suggest_float("dropout", 0.05, 0.25),
+    # "lr": trial.suggest_float("lr", 5e-4, 3e-3, log=True),
+    # "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-4, log=True)
+    # ----------------------------------------------
 
-    # Kernel Size (Feature Tokenizer)
-    kernel_size = trial.suggest_categorical("kernel_size", [5, 9, 11, 15])
+    # --- PHASE 2: FINE-TUNING  ---
+    d_model = 256
+    n_head = 8
+    num_layers = 2
+    dim_feedforward = 512
+    kernel_size = 21
     padding = kernel_size // 2
-
+    
     return {
-        # Architecture Params
         "d_model": d_model,
         "n_head": n_head,
-        "num_layers": trial.suggest_int("num_layers", 1, 4),
-        "dim_feedforward": trial.suggest_categorical("dim_feedforward", [64, 128, 256, 512]),
-        "dropout": trial.suggest_float("dropout", 0.2, 0.5),
+        "num_layers": num_layers,
+        "dim_feedforward": dim_feedforward,
         "kernel_size": kernel_size,
         "padding": padding,
 
-        # Training Params
-        "lr": trial.suggest_float("lr", 1e-4, 2e-3, log=True),
-        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
+        "dropout": trial.suggest_float("dropout", 0.05, 0.15),
+        "lr": trial.suggest_float("lr", 5e-4, 3e-3, log=True),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 5e-5, log=True)
     }
 
 
 def suggest_stgcn_params(trial):
+    # --- ST-GCN KEYPOINTS ---
+    # --- PHASE 1: COARSE SEARCH ---
+    # "hidden_channels": trial.suggest_categorical("hidden_channels", [16, 32, 64, 128]),
+    # "num_layers": trial.suggest_int("num_layers", 2, 8),
+    # "tcn_kernel_size": trial.suggest_categorical("tcn_kernel_size", [5, 9, 15, 21]),
+    # "dropout": trial.suggest_float("dropout", 0.1, 0.6),
+    # "graph_strategy": trial.suggest_categorical("graph_strategy", ["uniform", "spatial"]),
+    # "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
+    # "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
+    # ----------------------------------------------
+
+    # --- PHASE 2: FINE-TUNING (ST-GCN Keypoints)  ---
+    # "hidden_channels": 64, "num_layers": 7, "tcn_kernel_size": 9, "graph_strategy": "uniform"
+    # "dropout": [0.25, 0.5], "lr": [2e-3, 5e-3], "weight_decay": [1e-3, 1e-2]
+    # ----------------------------------------------
+
+    # --- ST-GCN KINEMATICS ---
+    # --- PHASE 1: COARSE SEARCH ---
+    # "hidden_channels": trial.suggest_categorical("hidden_channels", [16, 32, 64, 128]),
+    # "num_layers": trial.suggest_int("num_layers", 2, 8),
+    # "tcn_kernel_size": trial.suggest_categorical("tcn_kernel_size", [5, 9, 15, 21]),
+    # "dropout": trial.suggest_float("dropout", 0.1, 0.6),
+    # "graph_strategy": trial.suggest_categorical("graph_strategy", ["uniform", "spatial"]),
+    # "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
+    # "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-2, log=True)
+    # ----------------------------------------------
+
+    # --- PHASE 2: FINE-TUNING (ST-GCN Kinematics) ---
     return {
-        # Architecture
-        "hidden_channels": trial.suggest_categorical("hidden_channels", [32, 64, 128]),
-        # "hidden_channels": trial.suggest_categorical("hidden_channels", [128]),
-        "num_layers": trial.suggest_int("num_layers", 4, 9),
-        # "tcn_kernel_size": trial.suggest_categorical("tcn_kernel_size", [15]),
-        "tcn_kernel_size": trial.suggest_categorical("tcn_kernel_size", [7, 9, 15, 21]),
-        "dropout": trial.suggest_float("dropout", 0.1, 0.5),
+        "hidden_channels": 128,
+        "num_layers": 3,
+        "tcn_kernel_size": 21,
+        "graph_strategy": "uniform",
 
-        # Graph Strategy
-        "graph_strategy": trial.suggest_categorical("graph_strategy", ["uniform", "spatial"]),
-
-        # Training
-        "lr": trial.suggest_float("lr", 1e-4, 5e-3, log=True),
-        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 1e-3, log=True)
+        "dropout": trial.suggest_float("dropout", 0.15, 0.35),
+        "lr": trial.suggest_float("lr", 2e-3, 5e-3, log=True),
+        "weight_decay": trial.suggest_float("weight_decay", 1e-5, 5e-4, log=True)
     }
+
 
 SEARCH_SPACES = {
     #"GaitLSTM": suggest_lstm_params,
@@ -187,30 +241,42 @@ def objective(trial, base_cfg: TrainConfig, train_loader, val_loader, input_size
         steps_per_epoch=len(train_loader)
     )
 
-    trainer = Trainer(model, train_loader, val_loader, criterion, optimizer, scheduler, device, f1_window_frame)
+    trainer = Trainer(
+        model, train_loader, val_loader, criterion, 
+        optimizer, scheduler, device, f1_window_frame,
+        noise_std=current_cfg.training.noise_std
+    )
 
     try:
-        val_f1 = None
+        best_val_loss = float('inf')
+        best_val_f1 = 0.0
+
         for epoch in range(tuning_epochs):
             train_loss, train_f1 = trainer.train_epoch()
             val_loss, val_f1 = trainer.validate_epoch()
+
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_val_f1 = val_f1
 
             # Epoch based schedulers stepping
             if scheduler is not None and not isinstance(scheduler, OneCycleLR):
                 scheduler.step()
 
             # Report result to Optuna
-            trial.report(val_f1, epoch)
+            trial.report(val_loss, epoch)
 
             # Pruning - if current run is bad, stop it
             if trial.should_prune():
                 raise optuna.exceptions.TrialPruned()
 
-        return val_f1
+        # Save F1 score to trial attributes for later analysis
+        trial.set_user_attr("val_f1", float(best_val_f1))
+        return best_val_loss
 
     except RuntimeError as e:
         log("TUNE", f"Trial failed: {e}", level="error")
-        return 0.0
+        return float('inf')
 
 
 # ==============================================================================
@@ -260,7 +326,6 @@ def main():
 
     train_paths = file_paths[:train_idx]
     val_paths = file_paths[train_idx:val_idx]
-    # test_paths is strictly ignored during tuning to prevent data leakage!
 
     # Preprocessing Config
     preprocess_args = build_preprocess_args_from_train_config(cfg)
@@ -299,7 +364,7 @@ def main():
     log("TUNE", f"Starting Optuna Study: {args.study_name} ({args.trials} trials)", level="info")
 
     study = optuna.create_study(
-        direction="maximize",
+        direction="minimize",
         study_name=args.study_name,
         pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=3)
     )
@@ -312,16 +377,32 @@ def main():
     # --------------------------------------------------------------------------
     # RESULTS
     # --------------------------------------------------------------------------
-    log("TUNE", f"TUNING FINISHED. Best F1: {study.best_value:.4f}", level="success")
-    log("TUNE", "Best Params:", level="info")
-    for key, value in study.best_params.items():
-        log("TUNE", f"  {key}: {value}", level="info")
+    log("TUNE", "TUNING FINISHED.", level="success")
+
+    complete_trials = study.get_trials(deepcopy=False, states=[optuna.trial.TrialState.COMPLETE])
+    
+    if not complete_trials:
+        log("TUNE", "No trials completed successfully.", level="warning")
+        return
+        
+    complete_trials.sort(key=lambda t: t.value)
+
+    top_n = min(5, len(complete_trials))
+    log("TUNE", f"Top {top_n} Configurations:", level="info")
+    for i in range(top_n):
+        t = complete_trials[i]
+        val_f1 = t.user_attrs.get("val_f1")
+        f1_str = f"{val_f1:.4f}" if val_f1 is not None else "N/A"
+        log("TUNE", f"  Rank {i+1} (Trial {t.number}) | Loss: {t.value:.4f} | F1: {f1_str}", level="info")
+        for key, value in t.params.items():
+            log("TUNE", f"    {key}: {value}", level="info")
 
     # Save best parameters into config file
     output_path = os.path.join(os.path.dirname(args.config), "best_params.yaml")
 
     best_config_dump = {
-        "best_f1": float(study.best_value),
+        "best_val_loss": float(study.best_value),
+        "best_val_f1": float(study.best_trial.user_attrs.get("val_f1", 0.0)),
         "params": study.best_params
     }
 
