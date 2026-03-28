@@ -88,6 +88,35 @@ class OConnor(BaseHeuristicDetector):
         # Right Leg
         r_min, r_max = find_minima_maxima(r_mid_vel, distance=min_dist, prominence=prom_r)
 
+        height_factor = self.algorithm_params.get("height_factor", 0.6)
+
+        def filter_by_height(peak_array, is_maxima, factor):
+            """Vyfiltruje peaky v poli (kde ne-peaky jsou None) podle relativní výšky."""
+            # Vytáhneme jen reálné hodnoty peaků pro výpočet percentilů
+            peak_values = [val for val in peak_array if val is not None]
+
+            if not peak_values:
+                return peak_array  # Žádné peaky k filtrování
+
+            if is_maxima:
+                # HS (Kladná rychlost, hledáme maxima)
+                robust_max = np.percentile(peak_values, 90)
+                threshold = robust_max * factor
+                # Vrátíme pole, kde hodnoty pod prahem přepíšeme na None
+                return [val if (val is not None and val >= threshold) else None for val in peak_array]
+            else:
+                # TO (Záporná rychlost, hledáme minima - čím zápornější, tím větší peak)
+                robust_min = np.percentile(peak_values, 10)
+                threshold = robust_min * factor
+                # Vrátíme pole, kde hodnoty "nad" prahem (blíže nule) přepíšeme na None
+                return [val if (val is not None and val <= threshold) else None for val in peak_array]
+
+        # Aplikace výškového filtru
+        l_max = filter_by_height(l_max, is_maxima=True, factor=height_factor)
+        l_min = filter_by_height(l_min, is_maxima=False, factor=height_factor)
+        r_max = filter_by_height(r_max, is_maxima=True, factor=height_factor)
+        r_min = filter_by_height(r_min, is_maxima=False, factor=height_factor)
+
         left_events = []
         right_events = []
 

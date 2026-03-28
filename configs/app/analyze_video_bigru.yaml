@@ -25,7 +25,7 @@ event_detector:
 
   # NeuralNet configuration
   neural_net:
-    experiment_path: "experiments/BiGRU_RTMLIB"        # Name of the experiment folder
+    experiment_path: "experiments/BiGRU"                # Name of the experiment folder
     checkpoint: "best_model.pth"                        # Name of the checkpoint file (stays the same)
 
     post_processing:

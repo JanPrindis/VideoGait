@@ -17,14 +17,6 @@ preprocessing:
 event_detector:
   method: "Heuristic" # "NeuralNet" or "Heuristic"
 
-  neural_net:
-    experiment_path: "experiments/LSTM_Baseline_Halpe"
-    checkpoint: "best_model.pth"
-
-    post_processing:
-      threshold: 0.6
-      min_distance_sec: 0.25
-
   heuristic:
     method: "Ghoussayni"
     skeleton: "HALPE"
@@ -35,7 +27,7 @@ event_detector:
     params:
       # If null, ratio is used. If number (e.g. 50), it is used as fixed threshold (cm/s).
       velocity_threshold: null
-      velocity_threshold_ratio: 0.35 # % of max movement speed
+      velocity_threshold_ratio: 0.15 # % of max movement speed
 
       # Butterworth filter config for smoothing data for velocity calculation
       velocity_filter_cutoff: 6

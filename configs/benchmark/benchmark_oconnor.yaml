@@ -36,7 +36,8 @@ event_detector:
       velocity_filter_order: 9
       velocity_filter_cutoff: 3.0
       prominence: null
-      adaptive_prominence_factor: 0.8
+      adaptive_prominence_factor: 0.6
+      height_factor: 0.7
 
 data:
   dataset_root: "dataset/PROCESSED/rtmlib"
