@@ -18,17 +18,23 @@
 - If using standalone, otherwise just use the project's environment.
 
 ### Pytorch - CUDA 12.6
-> `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128`
+ ```bash
+ pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+ ```
 
 ### Dependencies
-> `pip install cython`
-> 
-> `pip install PyYAML`
+
+ ```bash
+ pip install cython
+ pip install PyYAML
+ ```
 
 ### Fix for HalpeCOCOTOOLS:
 (https://github.com/MVIG-SJTU/AlphaPose/issues/1195)
 
-> `pip install git+https://github.com/Ambrosiussen/HalpeCOCOAPI.git#subdirectory=PythonAPI`
+```bash
+pip install git+https://github.com/Ambrosiussen/HalpeCOCOAPI.git#subdirectory=PythonAPI
+ ```
 
 Inside `setup.py` replace
 ```python
@@ -61,10 +67,14 @@ def get_install_requires():
 
 
 ### Build
-> `python setup.py build develop`
+```bash
+python setup.py build develop
+```
 
 ### Fix deprecated usage np.Float
-> `pip install --upgrade cython-bbox`
+```bash
+pip install --upgrade cython-bbox
+```
 
 ## 🧠 2. Model Weights
 
