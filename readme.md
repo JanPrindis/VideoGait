@@ -151,3 +151,9 @@ This project utilizes and integrates the following open-source projects and mode
 
 
 *All third-party libraries and weights are subject to their respective licenses.*
+
+---
+
+## 🛑 Maintenance Status
+This project was developed solely for the purpose of a Master's Thesis and is provided **"as is"**. 
+There is **no active maintenance, no guaranteed support, and no planned future updates**.
