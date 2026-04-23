@@ -7,10 +7,10 @@ The application features a complete pipeline that takes a raw video of a walking
 
 ## 📸 Showcase
 
-![VideoGait TUI Dashboard](images/tui.png)
+![VideoGait TUI Dashboard](https://github.com/JanPrindis/VideoGait/blob/aae7f26ac542224813f951e1da31f678c6fb49ea/images/app_tui.png)
 *Interactive Textual-based terminal UI for configuring and running the analysis.*
 
-![Generated Report Sample](images/report.png)
+![Generated Report Sample](https://github.com/JanPrindis/VideoGait/blob/aae7f26ac542224813f951e1da31f678c6fb49ea/images/analysis_report.png)
 *Example of a generated PDF report containing spatiotemporal and kinematic gait parameters.*
 
 ---
