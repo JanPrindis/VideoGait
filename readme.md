@@ -5,6 +5,14 @@ This project was developed as part of a Master's Thesis *(a link to the thesis t
 
 The application features a complete pipeline that takes a raw video of a walking person, extracts their skeletal pose, detects key gait events (Heel Strikes and Toe Offs), and generates detailed PDF or interactive HTML reports containing gait parameters (step length, angles, velocities, symmetry, and more).
 
+## 📸 Showcase
+
+![VideoGait TUI Dashboard](images/tui.png)
+*Interactive Textual-based terminal UI for configuring and running the analysis.*
+
+![Generated Report Sample](images/report.png)
+*Example of a generated PDF report containing spatiotemporal and kinematic gait parameters.*
+
 ---
 
 ## ⚠️ Medical & Liability Disclaimer
@@ -23,7 +31,7 @@ The application features a complete pipeline that takes a raw video of a walking
 ---
 
 ## 📊 Dataset & Pre-trained Models
-- **Dataset:** The neural networks and heuristic benchmarks were developed and evaluated using the publicly available **KOA-PD-NM** dataset. Please note that the dataset itself is **not distributed** within this repository. You can get it from the original authors ([Mendeley Data](https://data.mendeley.com/datasets/44pfnysy89/1))
+- **Dataset:** The neural networks and heuristic benchmarks were developed and evaluated using the publicly available **KOA-PD-NM** dataset. Please note that the dataset itself is **not distributed** within this repository. You can get it from the original authors ([Mendeley Data](https://data.mendeley.com/datasets/44pfnysy89/1)).
 - **Model Weights:** Due to the medical and sensitive nature of the dataset (even though it is publicly available for research), the trained weights for the neural networks are **not included** in this repository to ensure strict privacy and compliance. You will need to acquire the dataset and train the models from scratch.
 
 ---
@@ -40,11 +48,17 @@ Install the core Python dependencies using `pip`:
 pip install -r requirements.txt
 ```
 
-### 3. Hardware Acceleration (CUDA) 
+### 3. PDF Export Setup (WeasyPrint)
+To generate beautiful PDF reports, the `weasyprint` Python library requires some additional system-level dependencies (like GTK) to be installed on your OS.
+Please follow the official guide to set it up for your specific system:
+
+👉 [WeasyPrint Installation Guide](https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation)
+
+### 4. Hardware Acceleration (CUDA) 
 If you want to run the neural networks and pose extractors on your GPU, you will need to set up CUDA. 
 *Note: Getting PyTorch and ONNX Runtime to play nicely with your specific CUDA and cuDNN versions can be a bumpy ride. We send our hopes and prayers. Good luck!*
 
-### 4. Detector Setup
+### 5. Detector Setup
 The project relies on external models for video interpolation and pose extraction. You **must** download the weights and set them up manually. Please refer to the specific setup guides:
 
 - [RTMLib Setup](detectors/rtmlib/setup.md)
@@ -54,7 +68,7 @@ The project relies on external models for video interpolation and pose extractio
 
 *(Note on **AlphaPose**: AlphaPose is supported but is not directly included in this repository due to its strict licensing. If you wish to use it, you must acquire and set it up yourself following their official guidelines.)*
 
-### 5. Dataset setup
+### 6. Dataset setup
 Obtain a copy of the KOA-PD-NM dataset, and extract it into the `dataset/` folder so the internal file structure looks exactly like this:
 
 ```text

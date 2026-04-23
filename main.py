@@ -77,7 +77,6 @@ def _generate_plots_and_report(app_config: AppConfig, output_dir: Path, analysis
         plotter.generate_plots_from_json(analysis_source=analysis_report)
 
     # --- EXPORT ---
-    # TODO: Annoying setup - document: https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#installation
     report_generator = ReportGenerator(
         app_config=app_config,
         output_dir=str(output_dir),

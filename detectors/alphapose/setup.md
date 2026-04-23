@@ -1,5 +1,11 @@
- # AlphaPose Setup
+# ⚙️ AlphaPose Setup
  
+ [🔗 **Official GitHub Repository**](https://github.com/MVIG-SJTU/AlphaPose) | [📄 **Paper**](https://arxiv.org/abs/2211.03375)
+ 
+ AlphaPose is an incredibly accurate, state-of-the-art multiperson pose estimator. However, due to its strict non-commercial licensing, it is **not directly included** in this repository. You have to fetch and build it yourself!
+ 
+ ## 📦 1. Installation
+
 - Requires Python (3.11)
 - Linux users follow [official installation instructions](https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/INSTALL.md) for dependencies and setup, the code setup stays the same.
 - Windows users need to follow these steps
@@ -60,7 +66,8 @@ def get_install_requires():
 ### Fix deprecated usage np.Float
 > `pip install --upgrade cython-bbox`
 
-### Download model weights
+## 🧠 2. Model Weights
+
 **Yolo Detector**
 - [Download](https://drive.google.com/file/d/1D47msNOOiJKvPOXlnpyzdKA3k6E97NTC/view)
 - Move to `detectors/alphapose/detector/yolo/data` (you have to create the folder)
@@ -77,6 +84,8 @@ def get_install_requires():
 **Model Weights**
 - [Downloads](https://drive.google.com/file/d/1zZotfE3WsBe1BxKimlK56wwJuK9E4EDs/view)
 - Move to `trackers/weights/` (you have to create the folder)
+ 
+## 💡 3. Notes
 
 You can get different models on the [AlphaPose GitHub repository](https://github.com/MVIG-SJTU/AlphaPose/blob/master/docs/MODEL_ZOO.md).
 
