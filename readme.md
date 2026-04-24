@@ -1,4 +1,4 @@
-# VideoGait 🚶‍♂️📹
+# VideoGait
 
 **VideoGait** is an experimental application for automated human gait analysis from monocular 2D RGB video. 
 This project was developed as part of a Master's Thesis *(a link to the thesis text will be added in the future, although it will be available only in Czech)*.
