@@ -69,6 +69,9 @@ def _setup_pipeline_environment(
 
 def _generate_plots_and_report(app_config: AppConfig, output_dir: Path, analysis_report: dict, an_name: str, output_format: str):
     """Helper to generate plots and the final report file."""
+    if "metadata" in analysis_report:
+        analysis_report["metadata"]["file"] = an_name
+
     # --- GENERATE PLOTS ---
     if output_format == "interactive":
         log("PIPELINE", "Interactive HTML selected, skipping plots generation.", level="warning")
