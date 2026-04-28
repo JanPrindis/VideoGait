@@ -81,9 +81,9 @@ class EventDetectorConfig(BaseModel):
     @model_validator(mode='after')
     def check_method_dependencies(self):
         if self.method == "NeuralNet" and self.neural_net is None:
-            raise ValueError('method="NeuralNet", ale chybí sekce "neural_net"!')
+            raise ValueError('method="NeuralNet", but missing section "neural_net"!')
         if self.method == "Heuristic" and self.heuristic is None:
-            raise ValueError('method="Heuristic", ale chybí sekce "heuristic"!')
+            raise ValueError('method="Heuristic", but missing section "heuristic"!')
         return self
 
 
