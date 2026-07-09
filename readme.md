@@ -10,10 +10,10 @@ The application features a complete pipeline that takes a raw video of a walking
 ![VideoGait TUI Dashboard](images/app_tui.png)
 *Interactive Textual-based terminal UI for configuring and running the analysis.*
 
-![Generated Report Sample](images/pdf_report.png)
+![Generated Report Sample](images/pdf-report.png)
 *Example of a generated PDF report containing spatiotemporal and kinematic gait parameters.*
 
-![Generated Report Sample](images/html_report.png)
+![Generated Report Sample](images/html-report.png)
 *Example of a generated interactive HTML report with dynamic charts and synchronized video playback.*
 
 ---
