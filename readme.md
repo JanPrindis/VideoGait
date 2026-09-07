@@ -1,7 +1,7 @@
 # VideoGait
 
 **VideoGait** is an experimental application for automated human gait analysis from monocular 2D RGB video. 
-This project was developed as part of a Master's Thesis *(a link to the thesis text will be added in the future, although it will be available only in Czech)*.
+This project was developed as part of a [Master's Thesis (Czech only)](http://hdl.handle.net/10084/160462).
 
 The application features a complete pipeline that takes a raw video of a walking person, extracts their skeletal pose, detects key gait events (Heel Strikes and Toe Offs), and generates detailed PDF or interactive HTML reports containing gait parameters (step length, angles, velocities, symmetry, and more).
 
